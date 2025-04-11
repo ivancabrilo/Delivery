@@ -1,5 +1,6 @@
 import argparse
 from InstanceCO25 import InstanceCO22
+import matplotlib.pyplot as plt
 
 def ReadInstance():
     parser = argparse.ArgumentParser()
@@ -13,22 +14,25 @@ def ReadInstance():
         print("Invalid instance.")
         return
     
-    print("Dataset name:", instance.Dataset)
-    print("Number of days:", instance.Days)
-    print("Number of locations:", len(instance.Locations))
-    print("First location:", instance.Locations[0])
-    print("Number of requests:", len(instance.Requests))
-    print("First request:", instance.Requests[0])
+    return instance
 
-
-def Optimize():
+def Optimize(instance):
+    # look at the nearest hub per customer 
+    # add that demand to the nearest hub 
+    # then you know demand of the hub
+    # truck to the hub with that demand 
     print("Optimizing...")
+
+    def countHowManyProducts(groupCustomersToHubs, requests):
+        
+        return products
+        
 
 def WriteResults():
     print("Writing results...")
 
 if __name__ == "__main__":
-    ReadInstance()
-    Optimize()
+    instance = ReadInstance()
+    optimization = Optimize(instance)
     WriteResults()
     print("Done.")
