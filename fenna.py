@@ -53,6 +53,13 @@ def Optimize(instance):
 
             products[(hubID, day, locationID_hub)] += np.array(amounts)
 
+        result = []
+
+        for (hubID, day, locationID_hub), amounts in products.items():
+            result.append([hubID, day, locationID_hub, amounts])
+        
+        return result # formatting is the same as the requests
+    
         return products # hubID day location amount
         
 
