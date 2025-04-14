@@ -1,6 +1,7 @@
 import argparse
 from InstanceCO25 import InstanceCO22
-import matplotlib.pyplot as plt
+import numpy as np
+from collections import defaultdict
 
 def ReadInstance():
     parser = argparse.ArgumentParser()
@@ -17,21 +18,22 @@ def ReadInstance():
     return instance
 
 def Optimize(instance):
-    # look at the nearest hub per customer 
-    # add that demand to the nearest hub 
-    # then you know demand of the hub
-    # truck to the hub with that demand 
     print("Optimizing...")
 
-    def hubProducts(groupCustomersToHubs, Requests): # assuming that the customer is equal to the location 
+    def hubProducts(groupCustomersToHubs, instance): # assuming that the customer is equal to the request 
         # returns how many products must be delivered to given hub from the depot
 
-        for day in Requests.desiredDay:
-            return
+        products = defaultdict(lambda: np.zeros(len(instance.Products)))
+        
+        for request in instance.Requests:
+            hub = groupCustomersToHubs[request.Customer]
+            day = request.Day
+            demand = np.array(request[3:])
 
-        products = {} # hubID day location amount 
+            products[(hub, day)] += demand
+         
 
-        return products
+        return products # hubID day location amount
         
 
 def WriteResults():
