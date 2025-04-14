@@ -59,8 +59,6 @@ def Optimize(instance):
             result.append([hubID, day, locationID_hub, amounts])
         
         return result # formatting is the same as the requests
-    
-        return products # hubID day location amount
         
 
 def WriteResults():
