@@ -23,8 +23,14 @@ def Optimize(instance):
     # truck to the hub with that demand 
     print("Optimizing...")
 
-    def countHowManyProducts(groupCustomersToHubs, requests):
-        
+    def hubProducts(groupCustomersToHubs, Requests): # assuming that the customer is equal to the location 
+        # returns how many products must be delivered to given hub from the depot
+
+        for day in Requests.desiredDay:
+            return
+
+        products = {} # hubID day location amount 
+
         return products
         
 
