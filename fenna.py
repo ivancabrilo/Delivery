@@ -40,12 +40,12 @@ def Optimize(instance):
 
         return formatted
 
+    formatted_requests = formatRequest(instance) # put here such that we only need to run it once
 
-    def hubProducts(groupCustomersToHubs, instance): # assuming that the customer is equal to the request 
+    def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming that the customer is equal to the request 
         # returns how many products must be delivered to given hub from the depot
 
         products = defaultdict(lambda: np.zeros(len(instance.Products)))
-        formatted_requests = formatRequest(instance)
 
         for ID_request, day, locationID, amounts in formatted_requests:
             hubID = groupCustomersToHubs[locationID]
