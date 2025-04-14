@@ -20,7 +20,10 @@ def ReadInstance():
 def Optimize(instance):
     print("Optimizing...")
 
-    def formatRequest(instance):
+    def formatRequest(instance): 
+        # returns the request in a format that is easier to work with
+        formatted = []
+
         for request in instance.Requests:
             # split the requests to get the information
             parts = request.split("amounts =")
@@ -33,29 +36,22 @@ def Optimize(instance):
             locationID_request = int(part1[2])
             amounts = [int(x) for x in part2.strip(',').split(',')]
 
-        return [ID_request, day, locationID_request, amounts]
+            formatted.append([ID_request, day, locationID_request, amounts])
+
+        return formatted
 
 
     def hubProducts(groupCustomersToHubs, instance): # assuming that the customer is equal to the request 
         # returns how many products must be delivered to given hub from the depot
 
         products = defaultdict(lambda: np.zeros(len(instance.Products)))
-        
-        for request in instance.Requests:
-            # split the requests to get the information
-            parts = request.split("amounts =")
-            part1 = parts[0].split()
-            part2 = parts[1]
+        formatted_requests = formatRequest(instance)
 
-            # assign the parts to the variables
-            ID_request = int(part1[0])
-            hubID = groupCustomersToHubs[ID_request] # if key is a string then adujust the key to be an int
-            day = int(part1[1])
-            locationID_hub = hubID + 1
-            amounts = [int(x) for x in part2.strip(',').split(',')]
+        for ID_request, day, locationID, amounts in formatted_requests:
+            hubID = groupCustomersToHubs[locationID]
+            locationID_hub = hubID + 1 # locationID_hub is the index of the hub in the list of locations
 
-            products[(hubID, day, locationID_hub)] += amounts
-         
+            products[(hubID, day, locationID_hub)] += np.array(amounts)
 
         return products # hubID day location amount
         
