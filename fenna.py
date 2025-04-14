@@ -26,11 +26,18 @@ def Optimize(instance):
         products = defaultdict(lambda: np.zeros(len(instance.Products)))
         
         for request in instance.Requests:
-            hub = groupCustomersToHubs[request.Customer]
-            day = request.Day
-            demand = np.array(request[3:])
+            hub = groupCustomersToHubs[request.]
+            parts = request.split("amounts =")
+            part1 = parts[0].split()
 
-            products[(hub, day)] += demand
+            ID_request = int(part1[0])
+            day = int(part1[1])
+            location = int(part1[2])
+
+            part2 = parts[1]
+            amounts = [int(x) for x in part2.strip(',').split(',')]
+
+            products[(hub, day)] += amounts
          
 
         return products # hubID day location amount
