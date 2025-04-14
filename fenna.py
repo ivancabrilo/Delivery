@@ -20,6 +20,22 @@ def ReadInstance():
 def Optimize(instance):
     print("Optimizing...")
 
+    def formatRequest(instance):
+        for request in instance.Requests:
+            # split the requests to get the information
+            parts = request.split("amounts =")
+            part1 = parts[0].split()
+            part2 = parts[1]
+
+            # assign the parts to the variables
+            ID_request = int(part1[0])
+            day = int(part1[1])
+            locationID_request = int(part1[2])
+            amounts = [int(x) for x in part2.strip(',').split(',')]
+
+        return [ID_request, day, locationID_request, amounts]
+
+
     def hubProducts(groupCustomersToHubs, instance): # assuming that the customer is equal to the request 
         # returns how many products must be delivered to given hub from the depot
 
@@ -40,7 +56,7 @@ def Optimize(instance):
 
             products[(hubID, day, locationID_hub)] += amounts
          
-        
+
         return products # hubID day location amount
         
 
