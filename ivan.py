@@ -70,14 +70,15 @@ class Hub:
         # this is where items from trucks are stored ["apple" : [5], "banana" : [10]]
         self.storage = storage 
 
-    def order_products(self, product_name: str, amount: int) -> bool:
-        if self.storage[product_name] >= amount:
-            self.storage[product_name] -= amount
-            return True
-        else:
-            return False
+    def order_products(self, ordered_procuts: defaultdict) -> bool: # load_on_vans
+        for item, amount in ordered_procuts.items():
+            if self.storage[item] >= amount:
+                self.storage[item] -= amount
+            else:
+                return False
 
-    def load(self, products: defaultdict):
+
+    def load_from_truck(self, products: defaultdict):
         for product, amount in products:
             self.storage[product] += amount
 
