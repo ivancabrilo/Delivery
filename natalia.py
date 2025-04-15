@@ -115,7 +115,7 @@ def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
     grouped = groupRequestsToHubs(instance, formatted)
     numberOfVans, routes = routeVan(instance, grouped, formatted)
-    #printVanRoutes(numberOfVans, routes)
+    printVanRoutes(numberOfVans, routes)
     result = hubProducts(grouped, instance, formatted)
     print(result)
 
