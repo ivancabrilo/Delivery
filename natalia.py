@@ -99,7 +99,7 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
 
     for ID_request, day, locationID, amounts in formatted_requests:
         hubID = groupCustomersToHubs[locationID]
-        locationID_hub = hubID + 1 # locationID_hub is the index of the hub in the list of locations
+        locationID_hub = hubID # locationID_hub is the index of the hub in the list of locations
 
         products[(hubID, day, locationID_hub)] += np.array(amounts)
 
@@ -110,14 +110,26 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
         
     return result # formatting is the same as the requests
         
+def routeTruck(instance, hubProductsgrouped):
+    # returns the routes for the vans
+    # for now one van for one request
+    routes = []
+    for hub in hubProductsgrouped:
+        hub_ID = hub[0]
+        hub_locationID = hub[2]
+        amounts = hub[3]
+        sum_amounts = np.sum(amounts)
+        print("hub_ID", hub_ID, "amounts", sum_amounts)
 
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
     grouped = groupRequestsToHubs(instance, formatted)
     numberOfVans, routes = routeVan(instance, grouped, formatted)
-    printVanRoutes(numberOfVans, routes)
+    #printVanRoutes(numberOfVans, routes)
     result = hubProducts(grouped, instance, formatted)
-    print(result)
+    for res in result:
+        print(res, "\n")
+    #routeTruck(instance, result)
 
 if __name__ == "__main__":
     instance = ReadInstance()

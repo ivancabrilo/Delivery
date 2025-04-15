@@ -39,7 +39,7 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
 
         for ID_request, day, locationID, amounts in formatted_requests:
             hubID = groupCustomersToHubs[locationID]
-            locationID_hub = hubID + 1 # locationID_hub is the index of the hub in the list of locations
+            locationID_hub = hubID # locationID_hub is the index of the hub in the list of locations
 
             products[(hubID, day, locationID_hub)] += np.array(amounts)
 
@@ -66,7 +66,7 @@ def Optimize(instance):
          #Find van routes
 
     # return the result
-
+ 
 def WriteResults():
     print("Writing results...")
 
