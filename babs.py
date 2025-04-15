@@ -1,6 +1,11 @@
 import argparse
 from InstanceCO25 import InstanceCO22
 
+from collections import defaultdict 
+import numpy as np
+
+
+
 def ReadInstance():
     parser = argparse.ArgumentParser()
     parser.add_argument("instance", help="Path to the instance file")
