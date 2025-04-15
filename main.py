@@ -22,20 +22,15 @@ def formatRequest(instance):
         formatted = []
 
         for request in instance.Requests:
-            # split the requests to get the information
-            parts = request.split("amounts =")
-            part1 = parts[0].split()
-            part2 = parts[1]
-
-            # assign the parts to the variables
-            ID_request = int(part1[0])
-            day = int(part1[1])
-            locationID_request = int(part1[2])
-            amounts = [int(x) for x in part2.strip(',').split(',')]
+            ID_request = request.ID
+            day = request.desiredDay
+            locationID_request = request.customerLocID
+            amounts = request.amounts
 
             formatted.append([ID_request, day, locationID_request, amounts])
 
         return formatted
+
 
 def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming that the customer is equal to the request 
         # returns how many products must be delivered to given hub from the depot
