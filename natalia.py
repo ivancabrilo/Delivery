@@ -125,7 +125,7 @@ def routeTruck(instance, hubProductsgrouped):
         amounts = hub[3]
         # have to sum each product separately so the truck knows how much of each to take
         sum_amounts = np.sum(amounts)
-       # print("hub_ID", hub_ID, "amounts", sum_amounts)
+        print("hub_ID", hub_ID, "amounts", sum_amounts)
         if sum_amounts <= instance.TruckCapacity:
             # if the request can be delivered by one truck, return the route
             # add the amount of each product to the route 
@@ -168,7 +168,7 @@ def writeTruckRoutes(numberOfTrucks, routes):
     for idx, route in enumerate(routes):
         hubID = route[0]
         amounts = route[2]  # this is a list
-        amounts_str = ", ".join(str(int(r)) for r in amounts)
+        amounts_str = ",".join(str(int(r)) for r in amounts)
         lines.append(f"{idx+1} H{hubID} {amounts_str}")
     return "\n".join(lines)
 
@@ -179,7 +179,7 @@ def writeVanRoutes(numberOfVans, routes):
     for idx, route in enumerate(routes):
         hubID = route[0]
         ID_requests = route[1]  # this is a list
-        requests_str = ", ".join(str(r) for r in ID_requests)
+        requests_str = ",".join(str(r) for r in ID_requests)
         lines.append(f"{idx+1} H{hubID} {requests_str}")
     return "\n".join(lines)
 
@@ -216,8 +216,8 @@ def Optimize(instance):
     #     file.write("\n")
         
     
-    # for res in result:
-    #     print(res, "\n")
+    for res in result:
+        print(res, "\n")
    
 
 if __name__ == "__main__":
