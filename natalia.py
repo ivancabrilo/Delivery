@@ -112,14 +112,54 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
         
 def routeTruck(instance, hubProductsgrouped):
     # returns the routes for the vans
-    # for now one van for one request
+    # for now one van for one request (hub) if possible
+    # works for day by day due to formatting of the answer
+    # can also do all days together and then edit only the formatting of answers, might save time and make the program faster
     routes = []
+    # arraySumAllHubs = np.sum([item[3] for item in hubProductsgrouped], axis=0)
+    # sumAllHubs = np.sum(arraySumAllHubs)
+    # print("sumAllHubs:", sumAllHubs)
     for hub in hubProductsgrouped:
         hub_ID = hub[0]
         hub_locationID = hub[2]
         amounts = hub[3]
+        # have to sum each product separately so the truck knows how much of each to take
         sum_amounts = np.sum(amounts)
         print("hub_ID", hub_ID, "amounts", sum_amounts)
+        if sum_amounts <= instance.TruckCapacity:
+            # if the request can be delivered by one truck, return the route
+            # add the amount of each product to the route 
+            route = [hub_ID, [hub_locationID], amounts]
+            print("route", route)
+            routes.append(route)
+        # else:
+        #     for i in math.ceil(sum_amounts/instance.TruckCapacity):     # round up to the nearest integer
+        #         # has to divide the products among the necessary trucks
+        #         for j in range(len(amounts)):
+        #             if amounts[j] < instance.TruckCapacity:
+        #                 # if the amount of product is less than the truck capacity, add it to the route
+        #                 route = [hub_ID, [hub_locationID], amounts[j]]
+        #                 print("route", route)
+        #                 routes.append(route)
+        #             else:
+        #                 # if the amount of product is greater than the truck capacity, divide it
+
+                        
+        #         route = [hub_ID, [hub_locationID], ]
+        #         routes.append(route)
+    
+    numberOfTrucks = len(routes)
+
+    return numberOfTrucks, routes
+
+def printTruckRoutes(numberOfTrucks, routes):
+    # prints the routes for the vans
+    print("NUMBER_OF_TRUCKS = ", numberOfTrucks)
+    for idx, route in enumerate(routes):
+        hubID = route[0]
+        amounts = route[2]  # this is a list
+        amounts_str = ", ".join(str(int(r)) for r in amounts)
+        print(f"{idx+1} H{hubID} {amounts_str}")
 
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
@@ -129,7 +169,8 @@ def Optimize(instance):
     result = hubProducts(grouped, instance, formatted)
     for res in result:
         print(res, "\n")
-    #routeTruck(instance, result)
+    numberOfTrucks, routesTrucks = routeTruck(instance, result)
+    printTruckRoutes(numberOfTrucks, routesTrucks)
 
 if __name__ == "__main__":
     instance = ReadInstance()
