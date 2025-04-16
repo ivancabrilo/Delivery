@@ -161,17 +161,59 @@ def printTruckRoutes(numberOfTrucks, routes):
         amounts_str = ", ".join(str(int(r)) for r in amounts)
         print(f"{idx+1} H{hubID} {amounts_str}")
 
+def writeTruckRoutes(numberOfTrucks, routes):
+    # prints the routes for the vans
+    lines = []
+    lines.append(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
+    for idx, route in enumerate(routes):
+        hubID = route[0]
+        amounts = route[2]  # this is a list
+        amounts_str = ", ".join(str(int(r)) for r in amounts)
+        lines.append(f"{idx+1} H{hubID} {amounts_str}")
+    return "\n".join(lines)
+
+def writeVanRoutes(numberOfVans, routes):
+    # prints the routes for the vans
+    lines = []
+    lines.append(f"NUMBER_OF_VANS = {numberOfVans}")
+    for idx, route in enumerate(routes):
+        hubID = route[0]
+        ID_requests = route[1]  # this is a list
+        requests_str = ", ".join(str(r) for r in ID_requests)
+        lines.append(f"{idx+1} H{hubID} {requests_str}")
+    return "\n".join(lines)
+
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
     grouped = groupRequestsToHubs(instance, formatted)
     result = hubProducts(grouped, instance, formatted)
-    print("DATASET = ", instance.Dataset)
-    for day in range(1, instance.Days + 1):
-        print("DAY =", day)
-        numberOfVans, routes = routeVan(instance, grouped, formatted)
-        numberOfTrucks, routesTrucks = routeTruck(instance, result)
-        printTruckRoutes(numberOfTrucks, routesTrucks)
-        printVanRoutes(numberOfVans, routes)
+    # print("DATASET = ", instance.Dataset)
+
+    with open("results_natalia.txt", "w") as file:
+        file.write(f"\nDATASET =  {instance.Dataset}\n")
+        for day in range(1, instance.Days + 1):
+            # print("DAY =", day)
+            file.write(f"\nDAY = {day}\n")
+            file.write("\n")
+
+            numberOfVans, routes = routeVan(instance, grouped, formatted)
+            numberOfTrucks, routesTrucks = routeTruck(instance, result)
+
+            # printTruckRoutes(numberOfTrucks, routesTrucks)
+            # printVanRoutes(numberOfVans, routes)
+
+            file.write(writeTruckRoutes(numberOfTrucks, routesTrucks))
+            file.write("\n")
+            file.write(writeVanRoutes(numberOfVans, routes))
+            file.write("\n")
+
+    # with open("results_natalia.txt", "w") as file:
+    #     file.write(f"\nDAY = {day}\n")
+    #     file.write("\n")
+    #     file.write(writeTruckRoutes(numberOfTrucks, routesTrucks))
+    #     file.write("\n")
+    #     file.write(writeVanRoutes(numberOfVans, routes))
+    #     file.write("\n")
         
     
     # for res in result:
