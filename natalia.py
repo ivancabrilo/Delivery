@@ -98,7 +98,7 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
     products = defaultdict(lambda: np.zeros(len(instance.Products)))
 
     for ID_request, day, locationID, amounts in formatted_requests:
-        hubID = groupCustomersToHubs[locationID]
+        hubID = groupCustomersToHubs[ID_request]
         locationID_hub = hubID # locationID_hub is the index of the hub in the list of locations
 
         products[(hubID, day, locationID_hub)] += np.array(amounts)
@@ -186,7 +186,9 @@ def writeVanRoutes(numberOfVans, routes):
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
     grouped = groupRequestsToHubs(instance, formatted)
-    result = hubProducts(grouped, instance, formatted)
+    print("grouped = ", grouped)
+    result_hubs = hubProducts(grouped, instance, formatted)
+    print("result_hubs = ", result_hubs)
     # print("DATASET = ", instance.Dataset)
 
     with open("results_natalia.txt", "w") as file:
@@ -195,9 +197,10 @@ def Optimize(instance):
             # print("DAY =", day)
             file.write(f"\nDAY = {day}\n")
             file.write("\n")
-
-            numberOfVans, routes = routeVan(instance, grouped, formatted)
-            numberOfTrucks, routesTrucks = routeTruck(instance, result)
+            formatted_day = [request for request in formatted if request[1] == day]
+            result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
+            numberOfVans, routes = routeVan(instance, grouped, formatted_day)
+            numberOfTrucks, routesTrucks = routeTruck(instance, result_day)
 
             # printTruckRoutes(numberOfTrucks, routesTrucks)
             # printVanRoutes(numberOfVans, routes)
@@ -216,8 +219,8 @@ def Optimize(instance):
     #     file.write("\n")
         
     
-    for res in result:
-        print(res, "\n")
+    # for res in result:
+    #     print(res, "\n")
    
 
 if __name__ == "__main__":
