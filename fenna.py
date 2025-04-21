@@ -72,6 +72,34 @@ def groupRequestsToHubs(instance, formatted_requests):
     return grouped
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
+    alpha = 2
+    beta = 1
+    gamma = 0.5
+    
+    hubs_to_requests = defaultdict()
+
+
+    for request in formatted_requests:
+        ID_request = request[0]
+        hubID = groupRequestsToHubs[ID_request]
+        hubs_to_requests[hubID].append(request) 
+
+
+    for hub in instance.Hubs:
+        #requests_for_hub = [request_id for request_id, hub_id in groupRequestsToHubs.items() if hub_id == hub.ID]
+        requests_for_hub = hubs_to_requests[hub.ID]
+        scores = defaultdict()
+        for request in requests_for_hub:
+            ID_request = request[0]
+            location_ID_request = request[2]
+            amounts = request[3]
+            distance = calculateDistance(instance, hub.ID, location_ID_request)
+            score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
+            scores[ID_request] = score
+        
+
+
+
     # returns the routes for the vans
     # for now one van for one request
     routes = []
