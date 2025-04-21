@@ -4,6 +4,26 @@ import numpy as np
 from collections import defaultdict
 import math
 
+class Vehicle:
+    def __init__(self, vehicle_type, vehicle_id, capacity, milage, visits, products):
+        self.vehicle_type = vehicle_type
+        self.vehicle_id = vehicle_id
+        self.capacity = capacity
+        self.milage = milage
+        self.visits = visits
+        self.products = products
+        #self.list_of_products = defaultdict(int)  # Default dictionary to store product quantities
+
+
+    def load(self, amount, distance):
+        total_amount = np.sum(amount)
+        self.products += amount
+        self.capacity -= total_amount
+        self.milage -= distance
+    
+    def return_carried_products(self):
+        return self.products
+
 def ReadInstance():
     parser = argparse.ArgumentParser()
     parser.add_argument("instance", help="Path to the instance file")
@@ -221,7 +241,6 @@ def Optimize(instance):
     # for res in result:
     #     print(res, "\n")
    
-
 if __name__ == "__main__":
     instance = ReadInstance()
     #print(type(instance))
