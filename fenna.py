@@ -16,7 +16,7 @@ class Vehicle:
 
 
     def load(self, amount, distance):
-        total_amount = np.sum(amount)
+        total_amount = sum(amount)
         self.products += amount
         self.capacity -= total_amount
         self.milage -= distance
@@ -37,12 +37,20 @@ def ReadInstance():
         return
     return instance
 
-def calculateDistance(instance, hubID, locationID):
-    # Calculate the distance between a hub and a location
-    hub = instance.Locations[hubID] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
-    # and then we have the hubs in order they appear in the file
-    location = instance.Locations[locationID - 1] # -1 as we have a list and index starts at 0
-    return math.ceil(math.sqrt(pow(hub.X - location.X, 2) + pow(hub.Y - location.Y, 2)))
+def calculateDistance(instance, locationID1, locationID2):
+    if 0 < locationID1 <= len(instance.Hubs):
+       location1 = instance.Locations[locationID1] # Then location of a hub which is just at its ID
+    else: 
+        locatoin1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
+    if 0 < locationID2 <= len(instance.Hubs): # Then location of a hub which is just at its ID
+       location2 = instance.Locations[locationID2]
+    else: 
+        location2 = instance.Locations[locationID2 - 1] # -1 as we have a list and index starts at 0
+    # # Calculate the distance between a hub and a location
+    # hub = instance.Locations[hubID] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
+    # # and then we have the hubs in order they appear in the file
+    # location = instance.Locations[locationID - 1] # -1 as we have a list and index starts at 0
+    return math.ceil(math.sqrt(pow(location1.X - location2.X, 2) + pow(location1.Y - location2.Y, 2)))
 
 def groupRequestsToHubs(instance, formatted_requests):
     # groups the requests to the hubs, the closest for now
@@ -72,7 +80,8 @@ def groupRequestsToHubs(instance, formatted_requests):
     return grouped
 
 def extramileage(instance, i, h, j):
-    m = calculateDistance(instance, i, h) + calculateDistance(instance, h, j) - calculateDistance(instance, i, j)
+    # Have to do -1 at second because calculateDistance is now based on hubs where hub ID was location ID, but this is not the case when location ID is given
+    m = calculateDistance(instance, i - 1, h) + calculateDistance(instance, h - 1, j) - calculateDistance(instance, i - 1, j) 
     return m
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
@@ -80,7 +89,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
     beta = 1
     gamma = 0.5
     
-    hubs_to_requests = defaultdict()
+    hubs_to_requests = defaultdict(list)
 
 
     for request in formatted_requests:
@@ -88,50 +97,66 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
         hubID = groupRequestsToHubs[ID_request]
         hubs_to_requests[hubID].append(request) 
 
+    van_number = 0
+    routes = [] # to keep track of routes of vans
 
     for hub in instance.Hubs:
         #requests_for_hub = [request_id for request_id, hub_id in groupRequestsToHubs.items() if hub_id == hub.ID]
         requests_for_hub = hubs_to_requests[hub.ID]
-        scores = defaultdict()
+        scores = defaultdict(float)
         for request in requests_for_hub:
             ID_request = request[0]
             location_ID_request = request[2]
             amounts = request[3]
             distance = calculateDistance(instance, hub.ID, location_ID_request)
             score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
-            scores[request] = score
-        
-        request_with_max_score = max(scores, key=scores.get)
-        van = Vehicle("van", 1, instance.VanCapacity, instance.VanMaxDistance, np.zeros(), np.zeros(len(instance.Products)))
-        van.visits[0] = request_with_max_score[0]
-        distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
-        van.load(request_with_max_score[3], distance)
-        requests_for_hub.remove(request_with_max_score)
+            hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
+            scores[hashable_request] = score
 
-        best_m = float("inf")
-        best_h = []
-        for request in requests_for_hub:
-            m = extramileage(instance, hub.ID, request[2], request_with_max_score[2])
-            if m < best_m:
-                best_m = m 
-                best_h = request
-        van.visits[1] = best_h[0]
-        distance = calculateDistance(instance, hub.ID, best_h[2])
-        van.load(best_h[3], distance)
-        requests_for_hub.remove(best_h)
+        # Runs untill all requests are served and uses as many vans as needed
+        while requests_for_hub:
+            van_number += 1
+            request_with_max_score = max(scores, key=scores.get) # this is the pivot
+            van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, [], [])
+            van.visits.append(request_with_max_score[0])
+            distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
+            van.load(request_with_max_score[3], distance)
+            # Have to format key to the format of the requests to remove it from the requests_for_hub list
+            request_with_max_score_formatted = [request_with_max_score[0], request_with_max_score[1], request_with_max_score[2], list(request_with_max_score[3])]
+            requests_for_hub.remove(request_with_max_score_formatted)
+            scores.pop(request_with_max_score)
+    
+            # Runs as long as still requests available but terminates the moment the van cannot serve more requests
+            while requests_for_hub:
+                best_m = float("inf")
+                best_h = []
+                best_after = -1
+                for request in requests_for_hub:
+                    # all visits inlcuding hubs at start and end
+                    all_visits = van.visits.copy()  # make a copy so you don't change the original
+                    all_visits.insert(0, hub.ID)
+                    all_visits.append(hub.ID)
+                    for i in all_visits:
+                        m = extramileage(instance, all_visits[i], request[2], all_visits[i+1])
+                        if m < best_m:
+                            best_m = m 
+                            best_h = request
+                            best_after = i
 
-    # returns the routes for the vans
-    # for now one van for one request
-    routes = []
-    for request in formatted_requests:
-        ID_request = request[0]
-        amounts = request[3]
-        hubID = groupRequestsToHubs[ID_request]
-        if sum(amounts) <= instance.VanCapacity:
-            # if the request can be delivered by one van, return the route
-            route = [hubID, [ID_request]]
-            routes.append(route)
-    numberOfVans = len(routes)
+                # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
+                van.visits.insert(best_after, best_h[0])
+                location_ID_last_visit = van.visits[-1] + len(instance.Hubs) + 1 # Location ID of request is request ID plus the number of hubs
+                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID, location_ID_last_visit) >= 0): 
+                    van.load(best_h[3], best_m) # extra distance to travel is extramileage m
+                    requests_for_hub.remove(best_h)
+                    hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
+                    scores.pop(hashable_best_h)
+                else:
+                    van.visits.remove(best_h[0]) # Van cannot serve this request so has to be removed
+                    routes.append(van.visits)
+                    break
+
+    numberOfVans = van_number # last van number is total number of vans used
 
     return numberOfVans, routes
 
