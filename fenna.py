@@ -71,6 +71,10 @@ def groupRequestsToHubs(instance, formatted_requests):
         grouped[ID_request] = closestID
     return grouped
 
+def extramileage(instance, i, h, j):
+    m = calculateDistance(instance, i, h) + calculateDistance(instance, h, j) - calculateDistance(instance, i, j)
+    return m
+
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
     alpha = 2
     beta = 1
@@ -95,10 +99,26 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             amounts = request[3]
             distance = calculateDistance(instance, hub.ID, location_ID_request)
             score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
-            scores[ID_request] = score
+            scores[request] = score
         
+        request_with_max_score = max(scores, key=scores.get)
+        van = Vehicle("van", 1, instance.VanCapacity, instance.VanMaxDistance, np.zeros(), np.zeros(len(instance.Products)))
+        van.visits[0] = request_with_max_score[0]
+        distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
+        van.load(request_with_max_score[3], distance)
+        requests_for_hub.remove(request_with_max_score)
 
-
+        best_m = float("inf")
+        best_h = []
+        for request in requests_for_hub:
+            m = extramileage(instance, hub.ID, request[2], request_with_max_score[2])
+            if m < best_m:
+                best_m = m 
+                best_h = request
+        van.visits[1] = best_h[0]
+        distance = calculateDistance(instance, hub.ID, best_h[2])
+        van.load(best_h[3], distance)
+        requests_for_hub.remove(best_h)
 
     # returns the routes for the vans
     # for now one van for one request
