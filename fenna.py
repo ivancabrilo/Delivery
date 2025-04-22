@@ -41,7 +41,8 @@ def calculateDistance(instance, locationID1, locationID2):
     if 0 < locationID1 <= len(instance.Hubs):
        location1 = instance.Locations[locationID1] # Then location of a hub which is just at its ID
     else: 
-        locatoin1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
+        location1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
+    
     if 0 < locationID2 <= len(instance.Hubs): # Then location of a hub which is just at its ID
        location2 = instance.Locations[locationID2]
     else: 
@@ -85,12 +86,12 @@ def extramileage(instance, i, h, j):
     return m
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
+    # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
     alpha = 2
     beta = 1
-    gamma = 0.5
+    gamma = 0.5 # not used yet but will be when we use another formula 
     
     hubs_to_requests = defaultdict(list)
-
 
     for request in formatted_requests:
         ID_request = request[0]
@@ -136,7 +137,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                     all_visits = van.visits.copy()  # make a copy so you don't change the original
                     all_visits.insert(0, hub.ID)
                     all_visits.append(hub.ID)
-                    for i in all_visits:
+                    for i in range(len(all_visits)-1):
                         m = extramileage(instance, all_visits[i], request[2], all_visits[i+1])
                         if m < best_m:
                             best_m = m 
@@ -165,7 +166,7 @@ def printVanRoutes(numberOfVans, routes):
     print("NUMBER_OF_VANS = ", numberOfVans)
     for idx, route in enumerate(routes):
         hubID = route[0]
-        ID_requests = route[1]  # this is a list
+        ID_requests = route[1:-1]  # this is a list
         requests_str = ", ".join(str(r) for r in ID_requests)
         print(f"{idx+1} H{hubID} {requests_str}")
 
@@ -270,7 +271,7 @@ def writeVanRoutes(numberOfVans, routes):
     lines.append(f"NUMBER_OF_VANS = {numberOfVans}")
     for idx, route in enumerate(routes):
         hubID = route[0]
-        ID_requests = route[1]  # this is a list
+        ID_requests = route[1:-1]  # this is a list
         requests_str = ",".join(str(r) for r in ID_requests)
         lines.append(f"{idx+1} H{hubID} {requests_str}")
     return "\n".join(lines)
