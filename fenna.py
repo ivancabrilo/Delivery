@@ -3,6 +3,7 @@ from InstanceCO25 import InstanceCO22
 import numpy as np
 from collections import defaultdict
 import math
+import pandas as pd
 
 class Vehicle:
     def __init__(self, vehicle_type, vehicle_id, capacity, milage, visits, products):
