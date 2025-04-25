@@ -38,19 +38,10 @@ def ReadInstance():
     return instance
 
 def calculateDistance(instance, locationID1, locationID2):
-    if 0 < locationID1 <= len(instance.Hubs):
-       location1 = instance.Locations[locationID1] # Then location of a hub which is just at its ID
-    else: 
-        location1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
+    location1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
     
-    if 0 < locationID2 <= len(instance.Hubs): # Then location of a hub which is just at its ID
-       location2 = instance.Locations[locationID2]
-    else: 
-        location2 = instance.Locations[locationID2 - 1] # -1 as we have a list and index starts at 0
-    # # Calculate the distance between a hub and a location
-    # hub = instance.Locations[hubID] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
-    # # and then we have the hubs in order they appear in the file
-    # location = instance.Locations[locationID - 1] # -1 as we have a list and index starts at 0
+    location2 = instance.Locations[locationID2 - 1] # -1 as we have a list and index starts at 0
+    
     return math.ceil(math.sqrt(pow(location1.X - location2.X, 2) + pow(location1.Y - location2.Y, 2)))
 
 def groupRequestsToHubs(instance, formatted_requests):
@@ -67,7 +58,7 @@ def groupRequestsToHubs(instance, formatted_requests):
         # find the closest hub to the locationID
         for hub in hubs:
             if ID_request in hub.allowedRequests:
-                distance = calculateDistance(instance, hub.ID, locationID)
+                distance = calculateDistance(instance, hub.ID+1, locationID)
                 # if first considered hub, assign it as closest
                 if closest is None:
                     closestID = hub.ID
@@ -81,8 +72,7 @@ def groupRequestsToHubs(instance, formatted_requests):
     return grouped
 
 def extramileage(instance, i, h, j):
-    # Have to do -1 at second because calculateDistance is now based on hubs where hub ID was location ID, but this is not the case when location ID is given
-    m = calculateDistance(instance, i - 1, h) + calculateDistance(instance, h - 1, j) - calculateDistance(instance, i - 1, j) 
+    m = calculateDistance(instance, i, h) + calculateDistance(instance, h, j) - calculateDistance(instance, i, j) 
     return m
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
@@ -109,7 +99,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             ID_request = request[0]
             location_ID_request = request[2]
             amounts = request[3]
-            distance = calculateDistance(instance, hub.ID, location_ID_request)
+            distance = calculateDistance(instance, hub.ID+1, location_ID_request)
             score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
             hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
             scores[hashable_request] = score
@@ -120,7 +110,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             request_with_max_score = max(scores, key=scores.get) # this is the pivot
             van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, np.zeros(len(requests_for_hub)), [])
             van.visits = np.append(van.visits, request_with_max_score[0])
-            distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
+            distance = calculateDistance(instance, hub.ID+1, request_with_max_score[2])
             van.load(request_with_max_score[3], distance)
             # Have to format key to the format of the requests to remove it from the requests_for_hub list
             request_with_max_score_formatted = [request_with_max_score[0], request_with_max_score[1], request_with_max_score[2], list(request_with_max_score[3])]
@@ -135,10 +125,11 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 for request in requests_for_hub:
                     # all visits inlcuding hubs at start and end
                     all_visit_locations = van.visits + len(instance.Hubs) + 1 # to make the request IDs into location IDs
+                    # Adding the hub loction ID at frond and back since it is the start and end
                     all_visit_locations = np.insert(all_visit_locations, 0, hub.ID + 1)
-                    all_visit_locations = np.append(all_visit_locations, hub.ID +1)
+                    all_visit_locations = np.append(all_visit_locations, hub.ID +1) 
                     for i in range(len(all_visit_locations)-1):
-                        m = extramileage(instance, all_visit_locations[i], request[3], all_visit_locations[i+1])
+                        m = extramileage(instance, all_visit_locations[i], request[2], all_visit_locations[i+1])
                         if m < best_m:
                             best_m = m 
                             best_h = request
@@ -147,7 +138,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 van.visits = np.insert(van.visits, best_after, best_h[0])
                 location_ID_last_visit = van.visits[-1] + len(instance.Hubs) + 1 # Location ID of request is request ID plus the number of hubs
-                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID, location_ID_last_visit) >= 0): 
+                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID+1, location_ID_last_visit) >= 0): 
                     van.load(best_h[3], best_m) # extra distance to travel is extramileage m
                     requests_for_hub.remove(best_h)
                     hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
