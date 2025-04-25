@@ -118,8 +118,8 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
         while requests_for_hub:
             van_number += 1
             request_with_max_score = max(scores, key=scores.get) # this is the pivot
-            van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, [], [])
-            van.visits.append(request_with_max_score[0])
+            van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, np.zeros(len(requests_for_hub)), [])
+            van.visits = np.append(van.visits, request_with_max_score[0])
             distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
             van.load(request_with_max_score[3], distance)
             # Have to format key to the format of the requests to remove it from the requests_for_hub list
@@ -134,18 +134,18 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 best_after = -1
                 for request in requests_for_hub:
                     # all visits inlcuding hubs at start and end
-                    all_visits = van.visits.copy()  # make a copy so you don't change the original
-                    all_visits.insert(0, hub.ID)
-                    all_visits.append(hub.ID)
-                    for i in range(len(all_visits)-1):
-                        m = extramileage(instance, all_visits[i], request[2], all_visits[i+1])
+                    all_visit_locations = van.visits + len(instance.Hubs) + 1 # to make the request IDs into location IDs
+                    all_visit_locations = np.insert(all_visit_locations, 0, hub.ID + 1)
+                    all_visit_locations = np.append(all_visit_locations, hub.ID +1)
+                    for i in range(len(all_visit_locations)-1):
+                        m = extramileage(instance, all_visit_locations[i], request[3], all_visit_locations[i+1])
                         if m < best_m:
                             best_m = m 
                             best_h = request
                             best_after = i
 
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
-                van.visits.insert(best_after, best_h[0])
+                van.visits = np.insert(van.visits, best_after, best_h[0])
                 location_ID_last_visit = van.visits[-1] + len(instance.Hubs) + 1 # Location ID of request is request ID plus the number of hubs
                 if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID, location_ID_last_visit) >= 0): 
                     van.load(best_h[3], best_m) # extra distance to travel is extramileage m
@@ -153,7 +153,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                     hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
                     scores.pop(hashable_best_h)
                 else:
-                    van.visits.remove(best_h[0]) # Van cannot serve this request so has to be removed
+                    van.visits = van.visits[van.visits != best_h[0]] # Van cannot serve this request so has to be removed
                     routes.append(van.visits)
                     break
 
