@@ -202,7 +202,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_
             distance = calculateDistance(hub.ID+1, request_with_max_score[2])
             van.load(request_with_max_score[3], distance)
 
-            cost += instance.VanDistanceCost * distance
+            cost += (instance.VanDistanceCost * distance)
 
             # Have to format key to the format of the requests to remove it from the requests_for_hub list
             request_with_max_score_formatted = [request_with_max_score[0], request_with_max_score[1], request_with_max_score[2], list(request_with_max_score[3])]
@@ -235,7 +235,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_
                     requests_for_hub.remove(best_h)
                     hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
                     scores.pop(hashable_best_h)
-                    cost += best_m * instance.VanDistanceCost
+                    cost += (best_m * instance.VanDistanceCost)
                 else:
                     van.visits = van.visits[van.visits != best_h[0]] # Van cannot serve this request so has to be removed
                     break
@@ -246,7 +246,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_
             routes.append(route)
 
     numberOfVans = van_number # last van number is total number of vans used
-    cost += instance.VanDayCost * numberOfVans
+    cost += (instance.VanDayCost * numberOfVans)
     return numberOfVans, routes, cost
 
 def printVanRoutes(numberOfVans, routes):
@@ -395,7 +395,7 @@ def routeTruck(instance, hubProductsgrouped):
         if sum_amounts <= instance.TruckCapacity:
             # if the request can be delivered by one truck, return the route
             # add the amount of each product to the route 
-            cost += 2 * instance.TruckDistanceCost * calculateDistance(location_depot, hub_locationID)
+            cost += (2 * instance.TruckDistanceCost * calculateDistance(location_depot, hub_locationID))
             route = [hub_ID, [hub_locationID], amounts]
             #print("route", route)
             routes.append(route)
@@ -416,7 +416,7 @@ def routeTruck(instance, hubProductsgrouped):
         #         routes.append(route)
     
     numberOfTrucks = len(routes)
-    cost += numberOfTrucks * instance.TruckDayCost
+    cost += (numberOfTrucks * instance.TruckDayCost)
     return numberOfTrucks, routes, cost
 
 def printTruckRoutes(numberOfTrucks, routes):
@@ -469,13 +469,13 @@ def Optimize(instance):
             result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
             numberOfVans, routesVans, costVans = routeVan(instance, grouped, formatted_day, dict_hubs, dict_requests)
             numberOfTrucks, routesTrucks, costTrucks = routeTruck(instance, result_day)
-            cost += costVans + costTrucks
+            cost += (costVans + costTrucks)
             all_numbers_of_vans.append(numberOfVans)
             all_numbers_of_trucks.append(numberOfTrucks)
             new_solution_day = Solution(day,numberOfVans, routesVans, numberOfTrucks, routesTrucks, cost)
             new_solution.append(new_solution_day)
         
-        total_cost = cost + max(all_numbers_of_vans) * instance.VanCost + max(all_numbers_of_trucks) * instance.TruckCost
+        total_cost = (cost + max(all_numbers_of_vans) * instance.VanCost + max(all_numbers_of_trucks) * instance.TruckCost)
 
         if(total_cost < lowestCost):
             lowestCost = total_cost
