@@ -45,15 +45,15 @@ def calculateDistance(loc1, loc2):
     location = instance.Locations[loc2 - 1] # -1 as we have a list and index starts at 0
     return math.ceil(math.sqrt(pow(hub.X - location.X, 2) + pow(hub.Y - location.Y, 2)))
 
-def dictionariesLocations():
+def dictionariesLocations(instance):
     hubs = {}
     requests = {}
 
-    for i in range(len(instance.Hubs) + 1):
+    for i in range(len(instance.Hubs)):
         hub = instance.Hubs[i]
         hubs[hub.ID] = hub.ID + 1 #locationID 
 
-    for i in range(len(instance.Requests) + 1):
+    for i in range(len(instance.Requests)):
         request = instance.Requests[i]
         requests[request.ID] = request.customerLocID
 
@@ -93,7 +93,7 @@ def groupRequestsToHubs(instance, formatted_requests):
         # find the closest hub to the locationID
         for hub in hubs:
             if ID_request in hub.allowedRequests:
-                distance = calculateDistance(instance, hub.ID+1, locationID)
+                distance = calculateDistance(hub.ID+1, locationID)
                 # if first considered hub, assign it as closest
                 if closest is None:
                     closestID = hub.ID
@@ -107,10 +107,10 @@ def groupRequestsToHubs(instance, formatted_requests):
     return grouped
 
 def extramileage(instance, i, h, j):
-    m = calculateDistance(instance, i, h) + calculateDistance(instance, h, j) - calculateDistance(instance, i, j) 
+    m = calculateDistance(i, h) + calculateDistance(h, j) - calculateDistance(i, j) 
     return m
 
-def routeVan(instance, groupRequestsToHubs, formatted_requests):
+def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_requests):
     # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
     alpha = 2
     beta = 1
@@ -134,7 +134,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             ID_request = request[0]
             location_ID_request = request[2]
             amounts = request[3]
-            distance = calculateDistance(instance, hub.ID+1, location_ID_request)
+            distance = calculateDistance(hub.ID+1, location_ID_request)
             score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
             hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
             scores[hashable_request] = score
@@ -143,9 +143,9 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
         while requests_for_hub:
             van_number += 1
             request_with_max_score = max(scores, key=scores.get) # this is the pivot
-            van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, np.zeros(len(requests_for_hub)), [])
+            van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, np.array([], dtype=int), [])
             van.visits = np.append(van.visits, request_with_max_score[0])
-            distance = calculateDistance(instance, hub.ID+1, request_with_max_score[2])
+            distance = calculateDistance(hub.ID+1, request_with_max_score[2])
             van.load(request_with_max_score[3], distance)
             # Have to format key to the format of the requests to remove it from the requests_for_hub list
             request_with_max_score_formatted = [request_with_max_score[0], request_with_max_score[1], request_with_max_score[2], list(request_with_max_score[3])]
@@ -159,7 +159,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 best_after = -1
                 for request in requests_for_hub:
                     # all visits inlcuding hubs at start and end
-                    all_visit_locations = van.visits + len(instance.Hubs) + 1 # to make the request IDs into location IDs
+                    all_visit_locations = np.array(list(map(dict_requests.get, van.visits)))# to make the request IDs into location IDs
                     # Adding the hub loction ID at frond and back since it is the start and end
                     all_visit_locations = np.insert(all_visit_locations, 0, hub.ID + 1)
                     all_visit_locations = np.append(all_visit_locations, hub.ID +1) 
@@ -172,15 +172,16 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
 
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 van.visits = np.insert(van.visits, best_after, best_h[0])
-                location_ID_last_visit = van.visits[-1] + len(instance.Hubs) + 1 # Location ID of request is request ID plus the number of hubs
-                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID+1, location_ID_last_visit) >= 0): 
+                location_ID_last_visit = dict_requests[van.visits[-1]] # Location ID of request is request ID plus the number of hubs
+                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(hub.ID+1, location_ID_last_visit) >= 0): 
                     van.load(best_h[3], best_m) # extra distance to travel is extramileage m
                     requests_for_hub.remove(best_h)
                     hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
                     scores.pop(hashable_best_h)
                 else:
                     van.visits = van.visits[van.visits != best_h[0]] # Van cannot serve this request so has to be removed
-                    routes.append(van.visits)
+                    route = [hub.ID, list(van.visits)]
+                    routes.append(route)
                     break
 
     numberOfVans = van_number # last van number is total number of vans used
@@ -318,7 +319,8 @@ def Optimize(instance):
             file.write("\n")
             formatted_day = [request for request in formatted if request[1] == day]
             result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
-            numberOfVans, routes = routeVan(instance, grouped, formatted_day)
+            dict_hubs, dict_requests = dictionariesLocations(instance)
+            numberOfVans, routes = routeVan(instance, grouped, formatted_day, dict_hubs, dict_requests)
             numberOfTrucks, routesTrucks = routeTruck(instance, result_day)
 
             # printTruckRoutes(numberOfTrucks, routesTrucks)
