@@ -1,0 +1,23 @@
+# filepath: c:\Users\rudos\Documents\GitHub\Delivery\newParser.py
+from baseParser import BaseParser
+
+class NewParser(BaseParser):
+    def _initData(self):
+        # Initialize data specific to NewParser
+        self.data = {}
+
+    def _initTXT(self):
+        # Parse TXT file specific to NewParser
+        self._initFile(self._parseTXT)
+
+    def _parseTXT(self, fd):
+        # Example implementation for parsing TXT files
+        while True:
+            line = self._getNextLine(fd)
+            if not line:
+                break
+            key, value = self._isAssignment(fd)
+            if key:
+                self.data[key] = value
+            else:
+                self._checkWarning(f"Unrecognized line: {line}", False)
