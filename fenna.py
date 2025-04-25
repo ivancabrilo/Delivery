@@ -3,6 +3,7 @@ from InstanceCO25 import InstanceCO22
 import numpy as np
 from collections import defaultdict
 import math
+import pandas as pd
 
 class Vehicle:
     def __init__(self, vehicle_type, vehicle_id, capacity, milage, visits, products):
@@ -37,21 +38,46 @@ def ReadInstance():
         return
     return instance
 
-def calculateDistance(instance, locationID1, locationID2):
-    if 0 < locationID1 <= len(instance.Hubs):
-       location1 = instance.Locations[locationID1] # Then location of a hub which is just at its ID
-    else: 
-        location1 = instance.Locations[locationID1 - 1] # -1 as we have a list and index starts at 0
-    
-    if 0 < locationID2 <= len(instance.Hubs): # Then location of a hub which is just at its ID
-       location2 = instance.Locations[locationID2]
-    else: 
-        location2 = instance.Locations[locationID2 - 1] # -1 as we have a list and index starts at 0
-    # # Calculate the distance between a hub and a location
-    # hub = instance.Locations[hubID] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
-    # # and then we have the hubs in order they appear in the file
-    # location = instance.Locations[locationID - 1] # -1 as we have a list and index starts at 0
-    return math.ceil(math.sqrt(pow(location1.X - location2.X, 2) + pow(location1.Y - location2.Y, 2)))
+def calculateDistance(loc1, loc2):
+    # Calculate the distance between a hub and a location
+    hub = instance.Locations[loc1 - 1] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
+    # and then we have the hubs in order they appear in the file
+    location = instance.Locations[loc2 - 1] # -1 as we have a list and index starts at 0
+    return math.ceil(math.sqrt(pow(hub.X - location.X, 2) + pow(hub.Y - location.Y, 2)))
+
+def dictionariesLocations():
+    hubs = {}
+    requests = {}
+
+    for i in range(len(instance.Hubs) + 1):
+        hub = instance.Hubs[i]
+        hubs[hub.ID] = hub.ID + 1 #locationID 
+
+    for i in range(len(instance.Requests) + 1):
+        request = instance.Requests[i]
+        requests[request.ID] = request.customerLocID
+
+    return hubs, requests 
+
+def distanceMatrix(listHubs, listRequests):
+    # returns the distance matrix between the hubs and the requests
+    # the distance is calculated using the Euclidean distance
+    # the distance is rounded up to the nearest integer
+    large_number = 999999999
+    n = len(instance.Locations)
+    distance_df = pd.DataFrame(-1, index=range(1, n + 1), columns=range(1, n + 1))
+    for i in range(1, n + 1):
+        for j in range(i, n + 1):
+            if i == j:
+                distance_df[i][j] = large_number
+            else:
+                distance = calculateDistance(i, j)
+                distance_df[i][j] = distance
+                distance_df[j][i] = distance
+                # instance.Locations[i], instance.Locations[j]
+
+    return distance_df
+
 
 def groupRequestsToHubs(instance, formatted_requests):
     # groups the requests to the hubs, the closest for now
@@ -67,7 +93,7 @@ def groupRequestsToHubs(instance, formatted_requests):
         # find the closest hub to the locationID
         for hub in hubs:
             if ID_request in hub.allowedRequests:
-                distance = calculateDistance(instance, hub.ID, locationID)
+                distance = calculateDistance(instance, hub.ID+1, locationID)
                 # if first considered hub, assign it as closest
                 if closest is None:
                     closestID = hub.ID
@@ -81,8 +107,7 @@ def groupRequestsToHubs(instance, formatted_requests):
     return grouped
 
 def extramileage(instance, i, h, j):
-    # Have to do -1 at second because calculateDistance is now based on hubs where hub ID was location ID, but this is not the case when location ID is given
-    m = calculateDistance(instance, i - 1, h) + calculateDistance(instance, h - 1, j) - calculateDistance(instance, i - 1, j) 
+    m = calculateDistance(instance, i, h) + calculateDistance(instance, h, j) - calculateDistance(instance, i, j) 
     return m
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests):
@@ -109,7 +134,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             ID_request = request[0]
             location_ID_request = request[2]
             amounts = request[3]
-            distance = calculateDistance(instance, hub.ID, location_ID_request)
+            distance = calculateDistance(instance, hub.ID+1, location_ID_request)
             score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
             hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
             scores[hashable_request] = score
@@ -120,7 +145,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
             request_with_max_score = max(scores, key=scores.get) # this is the pivot
             van = Vehicle("van", van_number, instance.VanCapacity, instance.VanMaxDistance, np.zeros(len(requests_for_hub)), [])
             van.visits = np.append(van.visits, request_with_max_score[0])
-            distance = calculateDistance(instance, hub.ID, request_with_max_score[2])
+            distance = calculateDistance(instance, hub.ID+1, request_with_max_score[2])
             van.load(request_with_max_score[3], distance)
             # Have to format key to the format of the requests to remove it from the requests_for_hub list
             request_with_max_score_formatted = [request_with_max_score[0], request_with_max_score[1], request_with_max_score[2], list(request_with_max_score[3])]
@@ -135,10 +160,11 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 for request in requests_for_hub:
                     # all visits inlcuding hubs at start and end
                     all_visit_locations = van.visits + len(instance.Hubs) + 1 # to make the request IDs into location IDs
+                    # Adding the hub loction ID at frond and back since it is the start and end
                     all_visit_locations = np.insert(all_visit_locations, 0, hub.ID + 1)
-                    all_visit_locations = np.append(all_visit_locations, hub.ID +1)
+                    all_visit_locations = np.append(all_visit_locations, hub.ID +1) 
                     for i in range(len(all_visit_locations)-1):
-                        m = extramileage(instance, all_visit_locations[i], request[3], all_visit_locations[i+1])
+                        m = extramileage(instance, all_visit_locations[i], request[2], all_visit_locations[i+1])
                         if m < best_m:
                             best_m = m 
                             best_h = request
@@ -147,7 +173,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests):
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 van.visits = np.insert(van.visits, best_after, best_h[0])
                 location_ID_last_visit = van.visits[-1] + len(instance.Hubs) + 1 # Location ID of request is request ID plus the number of hubs
-                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID, location_ID_last_visit) >= 0): 
+                if (van.capacity - np.sum(best_h[3]) >= 0) & (van.milage - best_m - calculateDistance(instance, hub.ID+1, location_ID_last_visit) >= 0): 
                     van.load(best_h[3], best_m) # extra distance to travel is extramileage m
                     requests_for_hub.remove(best_h)
                     hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
