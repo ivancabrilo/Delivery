@@ -3,6 +3,7 @@ from InstanceCO25 import InstanceCO22
 import numpy as np
 from collections import defaultdict
 import math
+import pandas as pd
 
 def ReadInstance():
     parser = argparse.ArgumentParser()
@@ -18,12 +19,46 @@ def ReadInstance():
     
     return instance
 
-def calculateDistance(instance, hubID, locationID):
+def calculateDistance(loc1, loc2):
     # Calculate the distance between a hub and a location
-    hub = instance.Locations[hubID] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
+    hub = instance.Locations[loc1 - 1] # first locationID is the depot but we are dealing with a list so hub 1 is at index 1
     # and then we have the hubs in order they appear in the file
-    location = instance.Locations[locationID - 1] # -1 as we have a list and index starts at 0
+    location = instance.Locations[loc2 - 1] # -1 as we have a list and index starts at 0
     return math.ceil(math.sqrt(pow(hub.X - location.X, 2) + pow(hub.Y - location.Y, 2)))
+
+def dictionariesLocations():
+    hubs = {}
+    requests = {}
+
+    for i in range(len(instance.Hubs) + 1):
+        hub = instance.Hubs[i]
+        hubs[hub.ID] = hub.ID + 1 #locationID 
+
+    for i in range(len(instance.Requests) + 1):
+        request = instance.Requests[i]
+        requests[request.ID] = request.customerLocID
+
+    return hubs, requests 
+
+def distanceMatrix(listHubs, listRequests):
+    # returns the distance matrix between the hubs and the requests
+    # the distance is calculated using the Euclidean distance
+    # the distance is rounded up to the nearest integer
+    large_number = 999999999
+    n = len(instance.Locations)
+    distance_df = pd.DataFrame(-1, index=range(1, n + 1), columns=range(1, n + 1))
+    for i in range(1, n + 1):
+        for j in range(i, n + 1):
+            if i == j:
+                distance_df[i][j] = large_number
+            else:
+                distance = calculateDistance(i, j)
+                distance_df[i][j] = distance
+                distance_df[j][i] = distance
+                # instance.Locations[i], instance.Locations[j]
+
+    return distance_df
+
 
 def groupRequestsToHubs(instance, formatted_requests):
     # groups the requests to the hubs, the closest for now
@@ -185,30 +220,35 @@ def writeVanRoutes(numberOfVans, routes):
 
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
-    grouped = groupRequestsToHubs(instance, formatted)
-    print("grouped = ", grouped)
-    result_hubs = hubProducts(grouped, instance, formatted)
-    print("result_hubs = ", result_hubs)
-    # print("DATASET = ", instance.Dataset)
+    matrix = distanceMatrix(instance.Hubs, formatted)
+    print( matrix)
+    with open("distance_matrix.txt", "w") as file:
+        for row in matrix:
+            file.write(matrix.to_string())
+    # grouped = groupRequestsToHubs(instance, formatted)
+    # print("grouped = ", grouped)
+    # result_hubs = hubProducts(grouped, instance, formatted)
+    # print("result_hubs = ", result_hubs)
+    # # print("DATASET = ", instance.Dataset)
 
-    with open("results_natalia.txt", "w") as file:
-        file.write(f"\nDATASET =  {instance.Dataset}\n")
-        for day in range(1, instance.Days + 1):
-            # print("DAY =", day)
-            file.write(f"\nDAY = {day}\n")
-            file.write("\n")
-            formatted_day = [request for request in formatted if request[1] == day]
-            result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
-            numberOfVans, routes = routeVan(instance, grouped, formatted_day)
-            numberOfTrucks, routesTrucks = routeTruck(instance, result_day)
+    # with open("results_natalia.txt", "w") as file:
+    #     file.write(f"\nDATASET =  {instance.Dataset}\n")
+    #     for day in range(1, instance.Days + 1):
+    #         # print("DAY =", day)
+    #         file.write(f"\nDAY = {day}\n")
+    #         file.write("\n")
+    #         formatted_day = [request for request in formatted if request[1] == day]
+    #         result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
+    #         numberOfVans, routes = routeVan(instance, grouped, formatted_day)
+    #         numberOfTrucks, routesTrucks = routeTruck(instance, result_day)
 
-            # printTruckRoutes(numberOfTrucks, routesTrucks)
-            # printVanRoutes(numberOfVans, routes)
+    #         # printTruckRoutes(numberOfTrucks, routesTrucks)
+    #         # printVanRoutes(numberOfVans, routes)
 
-            file.write(writeTruckRoutes(numberOfTrucks, routesTrucks))
-            file.write("\n")
-            file.write(writeVanRoutes(numberOfVans, routes))
-            file.write("\n")
+    #         file.write(writeTruckRoutes(numberOfTrucks, routesTrucks))
+    #         file.write("\n")
+    #         file.write(writeVanRoutes(numberOfVans, routes))
+    #         file.write("\n")
 
     # with open("results_natalia.txt", "w") as file:
     #     file.write(f"\nDAY = {day}\n")
