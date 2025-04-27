@@ -136,8 +136,8 @@ def groupRequestsToHubsMulti(instance, formatted_requests, iterations=5, offset_
             orig_location = instance.Locations[orig_loc_id - 1]
 
             # Alter location coordinates randomly
-            shifted_x = orig_location.X + random.randint(-offset_range, offset_range)
-            shifted_y = orig_location.Y + random.randint(-offset_range, offset_range)
+            shifted_x = orig_location.X + random.uniform(-offset_range, offset_range)
+            shifted_y = orig_location.Y + random.uniform(-offset_range, offset_range)
             shifted_locations[req_id] = (shifted_x, shifted_y)
 
             # Assign each request to the closest hub
@@ -178,6 +178,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_
 
     van_number = 0
     cost = 0
+    cost2 = 0
     routes = [] # to keep track of routes of vans
 
     for hub in instance.Hubs:
@@ -243,10 +244,12 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_hubs, dict_
             route = [hub.ID, van.visits.tolist()]
             location_ID_last_visit = dict_requests[van.visits[-1]]
             cost += instance.VanDistanceCost * calculateDistance(hub.ID+1, location_ID_last_visit) 
+
             routes.append(route)
 
     numberOfVans = van_number # last van number is total number of vans used
     cost += (instance.VanDayCost * numberOfVans)
+
     return numberOfVans, routes, cost
 
 def printVanRoutes(numberOfVans, routes):
@@ -275,13 +278,21 @@ def formatRequest(instance):
 
 def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming that the customer is equal to the request 
      # returns how many products must be delivered to given hub from the depot
-
+    #results = []
     products = defaultdict(lambda: np.zeros(len(instance.Products)))
+    shortest_fresh_time = float("inf")
+    
+    for product in instance.Products:
+        fresh_days = product.daysFresh
+        if fresh_days < shortest_fresh_time:
+            shortest_fresh_time = fresh_days
 
+    #for i in range(fresh_days+1):
     for ID_request, day, locationID, amounts in formatted_requests:
         hubID = groupCustomersToHubs[ID_request]
-        locationID_hub = hubID # locationID_hub is the index of the hub in the list of locations
-
+        #if i != 0:
+            #day -= (day - 1) % i
+        locationID_hub = hubID + 1 # locationID_hub is the hub ID plus 1 considdering depot has location ID 1
         products[(hubID, day, locationID_hub)] += np.array(amounts)
 
     result = []
@@ -289,6 +300,7 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
     for (hubID, day, locationID_hub), amounts in products.items():
         result.append([hubID, day, locationID_hub, amounts])
         
+    #results.append(result)
     return result # formatting is the same as the requests
 
 def routeTruck2(instance, hubProductsGrouped, dict_hubs):
@@ -452,7 +464,7 @@ def writeVanRoutes(numberOfVans, routes):
 
 def Optimize(instance):
     formatted = formatRequest(instance) # put here such that we only need to run it once
-    iterations = 0
+    iterations = 100
     offset_range = 3
     all_groupings = groupRequestsToHubsMulti(instance, formatted, iterations, offset_range)
     dict_hubs, dict_requests = dictionariesLocations(instance)
@@ -460,7 +472,12 @@ def Optimize(instance):
     lowestCost = float("inf")
     for grouped in all_groupings:
         result_hubs = hubProducts(grouped, instance, formatted)
+        #for result_hubs in results_hubs:
         cost = 0
+        # Calculate cost of used hubs
+        for hub in set(grouped.values()):
+            cost += instance.Hubs[hub-1].hubOpeningCost
+
         all_numbers_of_vans = []
         all_numbers_of_trucks = []
         new_solution = []
@@ -474,9 +491,8 @@ def Optimize(instance):
             all_numbers_of_trucks.append(numberOfTrucks)
             new_solution_day = Solution(day,numberOfVans, routesVans, numberOfTrucks, routesTrucks, cost)
             new_solution.append(new_solution_day)
-        
+            
         total_cost = (cost + max(all_numbers_of_vans) * instance.VanCost + max(all_numbers_of_trucks) * instance.TruckCost)
-
         if(total_cost < lowestCost):
             lowestCost = total_cost
             BestSolution = new_solution
@@ -512,6 +528,5 @@ def Optimize(instance):
 if __name__ == "__main__":
     random.seed(1234)
     instance = ReadInstance()
-    #print(type(instance))
     Optimize(instance)
     print("Done.")
