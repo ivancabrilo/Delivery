@@ -70,7 +70,7 @@ def dictionariesLocations(instance):
 
     return hubs, requests 
 
-def distanceMatrix(listHubs, listRequests):
+def distanceMatrix(hubs, requests, instance):
     # returns the distance matrix between the hubs and the requests
     # the distance is calculated using the Euclidean distance
     # the distance is rounded up to the nearest integer
@@ -80,17 +80,17 @@ def distanceMatrix(listHubs, listRequests):
     for i in range(1, n + 1):
         for j in range(i, n + 1):
             if i == j:
-                distance_df[i][j] = large_number
+                distance_df.loc[i,j] = large_number
             else:
                 distance = calculateDistance(i, j)
-                distance_df[i][j] = distance
-                distance_df[j][i] = distance
+                distance_df.loc[i,j] = distance
+                distance_df.loc[j,i] = distance
                 # instance.Locations[i], instance.Locations[j]
 
     return distance_df
 
 
-def groupRequestsToHubs(instance, formatted_requests):
+def groupRequestsToHubs(instance, formatted_requests, distance_df):
     # groups the requests to the hubs, the closest for now
     # returns a dictionary with the requestID as key and hubID as value
     grouped = {}
@@ -104,7 +104,7 @@ def groupRequestsToHubs(instance, formatted_requests):
         # find the closest hub to the locationID
         for hub in hubs:
             if ID_request in hub.allowedRequests:
-                distance = calculateDistance(hub.ID+1, locationID)
+                distance = distance_df.loc[hub.ID+1, locationID]
                 # if first considered hub, assign it as closest
                 if closest is None:
                     closestID = hub.ID
@@ -117,12 +117,10 @@ def groupRequestsToHubs(instance, formatted_requests):
         grouped[ID_request] = closestID
     return grouped
 
-def groupRequestsToHubsMulti(instance, formatted_requests, iterations=5, offset_range=5):
-    
-   
+def groupRequestsToHubsMulti(instance, formatted_requests, distance_df, iterations=5, offset_range=5):
     all_groupings = []
 
-    original_grouping = groupRequestsToHubs(instance, formatted_requests)
+    original_grouping = groupRequestsToHubs(instance, formatted_requests, distance_df)
     all_groupings.append(original_grouping)
 
     for _ in range(iterations):
@@ -160,11 +158,11 @@ def groupRequestsToHubsMulti(instance, formatted_requests, iterations=5, offset_
 
     return all_groupings
 
-def extramileage(instance, i, h, j):
+def extramileage(i, h, j):
     m = calculateDistance(i, h) + calculateDistance(h, j) - calculateDistance(i, j) 
     return m
 
-def calculateScores(hub, requests_for_hub):
+def calculateScores(hub, requests_for_hub, distance_df):
      # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
     alpha = 2
     beta = 1
@@ -178,7 +176,7 @@ def calculateScores(hub, requests_for_hub):
         location_ID_request = request[2]
         amounts = request[3]
         demand_hub += np.sum(amounts)
-        distance = calculateDistance(hub.ID+1, location_ID_request)
+        distance = distance_df.loc[hub.ID+1, location_ID_request]
         score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
         hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
         scores[hashable_request] = score
@@ -195,7 +193,7 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy):
         van = vans[j-1]
         for request in requests_for_hub_copy:
             for i in range(len(van.all_visit_locations)-1):
-                m = extramileage(instance, van.all_visit_locations[i], request[2], van.all_visit_locations[i+1])
+                m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1])
                 if m < best_m:
                     best_m = m 
                     best_h = request
@@ -203,7 +201,7 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy):
                     index_best_van = j-1
     return (best_m, best_h, best_after, index_best_van)
 
-def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests):
+def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, distance_df):
     hubs_to_requests = defaultdict(list)
 
     for request in formatted_requests:
@@ -218,7 +216,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests):
     # Find the best routes for each hub 
     for hub in instance.Hubs:
         requests_for_hub = hubs_to_requests[hub.ID]
-        demand_hub, scores = calculateScores(hub, requests_for_hub)
+        demand_hub, scores = calculateScores(hub, requests_for_hub, distance_df)
         lowest_routes_cost = float("inf")
         best_routes = []
         best_number_of_vans = 0
@@ -242,7 +240,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests):
                 van.all_visit_locations = np.insert(van.all_visit_locations, 0, hub.ID + 1)
                 van.all_visit_locations = np.append(van.all_visit_locations, hub.ID +1) 
 
-                distance = calculateDistance(hub.ID+1, request_with_max_score[2])
+                distance = distance_df.loc[hub.ID+1, request_with_max_score[2]]
                 van.load(request_with_max_score[3], distance)
 
                 vans.append(van)
@@ -261,7 +259,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests):
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 vans[index_best_van].visits = np.insert(vans[index_best_van].visits, best_after-1, best_h[0]) # best_after-1 since this is an index for all_visit_locations where the first index is for the hub and this is not the case for the visits
                 location_ID_last_visit = dict_requests[vans[index_best_van].visits[-1]] # Location ID of request is request ID plus the number of hubs
-                if (vans[index_best_van].capacity - np.sum(best_h[3]) >= 0) & (vans[index_best_van].milage - best_m - calculateDistance(hub.ID+1, location_ID_last_visit) >= 0): 
+                if (vans[index_best_van].capacity - np.sum(best_h[3]) >= 0) & (vans[index_best_van].milage - best_m - distance_df.loc[hub.ID+1, location_ID_last_visit] >= 0): 
                     vans[index_best_van].load(best_h[3], best_m) # extra distance to travel is extramileage m
                     vans[index_best_van].all_visit_locations = np.insert(vans[index_best_van].all_visit_locations, best_after, dict_requests[best_h[0]])
                     requests_for_hub_copy.remove(best_h)
@@ -280,7 +278,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests):
                 for van in vans:
                     route = [hub.ID, van.visits.tolist()]
                     location_ID_last_visit = dict_requests[van.visits[-1]]
-                    routes_cost += instance.VanDistanceCost * calculateDistance(hub.ID+1, location_ID_last_visit) 
+                    routes_cost += instance.VanDistanceCost * distance_df.loc[hub.ID+1, location_ID_last_visit] 
                     option_routes.append(route)
                 routes_cost += (instance.VanDayCost * number_of_vans)
             else: 
@@ -375,7 +373,7 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
         results.append(result)
     return results # formatting is the same as the requests
 
-def routeTruck2(instance, hubProductsGrouped, dict_hubs):
+def routeTruck2(instance, hubProductsGrouped, dict_hubs, distance_df):
     # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
     alpha = 2
     beta = 1
@@ -391,7 +389,7 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs):
         ID_hub = hub[0]
         location_ID_hub = hub[2]
         amounts = hub[3]
-        distance = calculateDistance(location_depot, location_ID_hub)
+        distance = distance_df.loc[location_depot, location_ID_hub]
         score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
         hashable_hub = (hub[0], hub[1], hub[2], tuple(hub[3])) # to be able to have the request as a dictionairy ID
         scores[hashable_hub] = score
@@ -402,7 +400,7 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs):
         hub_with_max_score = max(scores, key=scores.get) # this is the pivot
         truck = Vehicle("truck", truck_number, instance.TruckCapacity, instance.TruckMaxDistance, [np.array([], dtype=int)], np.array([], dtype=int), [])
         truck.visits = np.append(truck.visits, hub_with_max_score[0])
-        distance = calculateDistance(location_depot, hub_with_max_score[2])
+        distance = distance_df.loc[location_depot, hub_with_max_score[2]]
         amounts = hub_with_max_score[3]
 
         if np.sum(amounts) <= instance.TruckCapacity:
@@ -429,7 +427,7 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs):
                 truck.all_visit_locations = np.insert(truck.all_visit_locations, 0, location_depot)
                 truck.all_visit_locations = np.append(truck.all_visit_locations, location_depot) 
                 for i in range(len(truck.all_visit_locations)-1):
-                    m = extramileage(instance, truck.all_visit_locations[i], hub[2], truck.all_visit_locations[i+1])
+                    m = extramileage(truck.all_visit_locations[i], hub[2], truck.all_visit_locations[i+1])
                     if m < best_m:
                         best_m = m 
                         best_h = hub
@@ -438,7 +436,7 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs):
             # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
             truck.visits = np.insert(truck.visits, best_after - 1, best_h[0])
             location_ID_last_visit = dict_hubs[truck.visits[-1]] # Location ID of request is request ID plus the number of hubs
-            if (truck.capacity - np.sum(best_h[3]) >= 0) & (truck.milage - best_m - calculateDistance(location_depot, location_ID_last_visit) >= 0): 
+            if (truck.capacity - np.sum(best_h[3]) >= 0) & (truck.milage - best_m - distance_df.loc[location_depot, location_ID_last_visit] >= 0): 
                 truck.load(best_h[3], best_m) # extra distance to travel is extramileage m
                 hubProductsGrouped.remove(best_h)
                 hashable_best_h = (best_h[0], best_h[1], best_h[2], tuple(best_h[3])) # convert best_h into format of keys in scores
@@ -450,14 +448,14 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs):
 
         route = [truck.visits.tolist(), truck.products]
         location_ID_last_visit = dict_hubs[truck.visits[-1]]
-        cost += instance.TruckDistanceCost * calculateDistance(location_depot, location_ID_last_visit) 
+        cost += instance.TruckDistanceCost * distance_df.loc[location_depot, location_ID_last_visit]
         routes.append(route)
 
     numberOfVans = truck_number # last van number is total number of vans used
     cost += instance.VanDayCost * numberOfVans
     return numberOfVans, routes, cost
        
-def routeTruck(instance, hubProductsgrouped):
+def routeTruck(instance, hubProductsgrouped, distance_df):
     # returns the routes for the vans
     # for now one van for one request (hub) if possible
     # works for day by day due to formatting of the answer
@@ -478,7 +476,7 @@ def routeTruck(instance, hubProductsgrouped):
         if sum_amounts <= instance.TruckCapacity:
             # if the request can be delivered by one truck, return the route
             # add the amount of each product to the route 
-            cost += (2 * instance.TruckDistanceCost * calculateDistance(location_depot, hub_locationID))
+            cost += (2 * instance.TruckDistanceCost * distance_df.loc[location_depot, hub_locationID])
             route = [hub_ID, [hub_locationID], amounts]
             #print("route", route)
             routes.append(route)
@@ -538,10 +536,11 @@ def Optimize(instance):
     iterations = 100
     offset_range = 3
     dict_hubs, dict_requests = dictionariesLocations(instance)
+    distance_df = distanceMatrix(dict_hubs, dict_requests, instance) # distance matrix between the hubs and the requests
     BestSolution = None
     lowestCost = float("inf")
     for formatted, extra_cost in all_formatted:
-        all_groupings = groupRequestsToHubsMulti(instance, formatted, iterations, offset_range)
+        all_groupings = groupRequestsToHubsMulti(instance, formatted, distance_df, iterations, offset_range)
         for grouped in all_groupings:
             results_hubs = hubProducts(grouped, instance, formatted)
             for result_hubs in results_hubs:
@@ -556,8 +555,8 @@ def Optimize(instance):
                 for day in range(1, instance.Days + 1):
                     formatted_day = [request for request in formatted if request[1] == day]
                     result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
-                    numberOfVans, routesVans, costVans = routeVan(instance, grouped, formatted_day, dict_requests)
-                    numberOfTrucks, routesTrucks, costTrucks = routeTruck2(instance, result_day, dict_hubs)
+                    numberOfVans, routesVans, costVans = routeVan(instance, grouped, formatted_day, dict_requests, distance_df)
+                    numberOfTrucks, routesTrucks, costTrucks = routeTruck2(instance, result_day, dict_hubs, distance_df)
                     cost += (costVans + costTrucks)
                     all_numbers_of_vans.append(numberOfVans)
                     all_numbers_of_trucks.append(numberOfTrucks)
