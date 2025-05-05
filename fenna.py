@@ -74,13 +74,13 @@ def distanceMatrix(hubs, requests, instance):
     # returns the distance matrix between the hubs and the requests
     # the distance is calculated using the Euclidean distance
     # the distance is rounded up to the nearest integer
-    large_number = 999999999
+    # large_number = 999999999
     n = len(instance.Locations)
     distance_df = pd.DataFrame(-1, index=range(1, n + 1), columns=range(1, n + 1))
     for i in range(1, n + 1):
         for j in range(i, n + 1):
             if i == j:
-                distance_df.loc[i,j] = large_number
+                distance_df.loc[i,j] = 0
             else:
                 distance = calculateDistance(i, j)
                 distance_df.loc[i,j] = distance
@@ -158,8 +158,8 @@ def groupRequestsToHubsMulti(instance, formatted_requests, distance_df, iteratio
 
     return all_groupings
 
-def extramileage(i, h, j):
-    m = calculateDistance(i, h) + calculateDistance(h, j) - calculateDistance(i, j) 
+def extramileage(i, h, j, distance_df):
+    m = distance_df.loc[i, h] + distance_df.loc[h, j] - distance_df.loc[i, j] 
     return m
 
 def calculateScores(hub, requests_for_hub, distance_df):
@@ -183,7 +183,7 @@ def calculateScores(hub, requests_for_hub, distance_df):
     
     return (demand_hub, scores)
 
-def findBestInsertion(available_vans, vans, requests_for_hub_copy):
+def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df):
     best_m = float("inf")
     best_h = []
     best_after = -1
@@ -193,7 +193,7 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy):
         van = vans[j-1]
         for request in requests_for_hub_copy:
             for i in range(len(van.all_visit_locations)-1):
-                m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1])
+                m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1], distance_df)
                 if m < best_m:
                     best_m = m 
                     best_h = request
@@ -254,7 +254,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
         
             # Runs as long as still requests available 
             while requests_for_hub_copy:
-                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy)
+                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df)
 
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 vans[index_best_van].visits = np.insert(vans[index_best_van].visits, best_after-1, best_h[0]) # best_after-1 since this is an index for all_visit_locations where the first index is for the hub and this is not the case for the visits
@@ -427,7 +427,7 @@ def routeTruck2(instance, hubProductsGrouped, dict_hubs, distance_df):
                 truck.all_visit_locations = np.insert(truck.all_visit_locations, 0, location_depot)
                 truck.all_visit_locations = np.append(truck.all_visit_locations, location_depot) 
                 for i in range(len(truck.all_visit_locations)-1):
-                    m = extramileage(truck.all_visit_locations[i], hub[2], truck.all_visit_locations[i+1])
+                    m = extramileage(truck.all_visit_locations[i], hub[2], truck.all_visit_locations[i+1], distance_df)
                     if m < best_m:
                         best_m = m 
                         best_h = hub
