@@ -162,29 +162,61 @@ def extramileage(i, h, j, distance_df):
     m = distance_df.loc[i, h] + distance_df.loc[h, j] - distance_df.loc[i, j] 
     return m
 
-def calculateScores(hub, requests_for_hub, distance_df):
-     # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
-    alpha = 2
-    beta = 1
-    gamma = 0.5 # not used yet but will be when we use another formula 
+def calculateScores(hub, requests_for_hub, distance_df, num_pivots):
+    # alpha, beta an gamma are weights for the score of the requests and can be changed to optimize the solution
+    alpha = 1
+    beta = 3
+    gamma = 2.5
     
     demand_hub = 0
     scores = defaultdict(float)
 
+    # Compute the normalization factors
+    if requests_for_hub:
+        q_max = max([np.sum(request[3]) for request in requests_for_hub]) 
+        c0_max = max([distance_df.loc[hub.ID+1, request[2]] for request in requests_for_hub]) 
+    else:
+        q_max = c0_max = 1
+    
+    c_max = distance_df.values.max() if not distance_df.empty else 1
+
+    preliminary_scores = {}
     for request in requests_for_hub:
-        ID_request = request[0]
+        demand = np.sum(request[3])
+        norm_demand = demand / q_max
+
         location_ID_request = request[2]
-        amounts = request[3]
-        demand_hub += np.sum(amounts)
+        distance = distance_df.loc[hub.ID + 1, location_ID_request]
+        norm_depot_distance = distance / c0_max 
+
+        score = alpha * norm_demand + beta * norm_depot_distance
+        hashable_request = (request[0], request[1], location_ID_request, tuple(request[3]))
+        preliminary_scores[hashable_request] = score
+
+    sorted_requests = sorted(preliminary_scores.items(), key=lambda x: x[1], reverse=True)
+    pivot_locations = [req[0][2] for req in sorted_requests[:min(num_pivots, len(requests_for_hub))]]
+
+    for request in requests_for_hub:
+        location_ID_request = request[2]
+        demand = np.sum(request[3])
+        demand_hub += demand
+
+        norm_demand = demand / q_max 
         distance = distance_df.loc[hub.ID+1, location_ID_request]
-        score = alpha * np.sum(amounts) + beta * distance # Can be made better with normalization but need matrix for that
-        hashable_request = (request[0], request[1], request[2], tuple(request[3])) # to be able to have the request as a dictionairy ID
+        norm_depot_distance = distance / c0_max 
+
+        norm_pivot_distance = 0
+        if gamma > 0 and pivot_locations:
+            norm_pivot_distance = np.sum([distance_df.loc[location_ID_request, pivot] / c_max for pivot in pivot_locations]) 
+
+        score = alpha * norm_demand + beta * norm_depot_distance + gamma * norm_pivot_distance
+        hashable_request = (request[0], request[1], location_ID_request, tuple(request[3])) # to be able to have the request as a dictionairy ID
         scores[hashable_request] = score
     
     return (demand_hub, scores)
 
-def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df):
-    best_m = float("inf")
+def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df, scores):
+    best_value = float("inf")
     best_h = []
     best_after = -1
     index_best_van = -1
@@ -194,12 +226,17 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df):
         for request in requests_for_hub_copy:
             for i in range(len(van.all_visit_locations)-1):
                 m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1], distance_df)
-                if m < best_m:
-                    best_m = m 
+                hashable_request = (request[0], request[1], request[2], tuple(request[3]))
+                score = scores.get(hashable_request, 0)
+
+                weighted_cost = m - score * 1 # Adjust the weight as needed
+                if weighted_cost < best_value:
+                    best_value = weighted_cost
                     best_h = request
                     best_after = i
                     index_best_van = j-1
-    return (best_m, best_h, best_after, index_best_van)
+                    
+    return (best_value, best_h, best_after, index_best_van)
 
 def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, distance_df):
     hubs_to_requests = defaultdict(list)
@@ -216,7 +253,8 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
     # Find the best routes for each hub 
     for hub in instance.Hubs:
         requests_for_hub = hubs_to_requests[hub.ID]
-        demand_hub, scores = calculateScores(hub, requests_for_hub, distance_df)
+        num_pivots = 10
+        demand_hub, scores = calculateScores(hub, requests_for_hub, distance_df, num_pivots)
         lowest_routes_cost = float("inf")
         best_routes = []
         best_number_of_vans = 0
@@ -254,7 +292,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
         
             # Runs as long as still requests available 
             while requests_for_hub_copy:
-                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df)
+                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df, scores_copy)
 
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 vans[index_best_van].visits = np.insert(vans[index_best_van].visits, best_after-1, best_h[0]) # best_after-1 since this is an index for all_visit_locations where the first index is for the hub and this is not the case for the visits
@@ -569,7 +607,7 @@ def Optimize(instance):
                     BestSolution = new_solution
     print(lowestCost)
     # Write solution in file
-    with open("solution_main.txt", "w") as file:
+    with open("solution_fenna.txt", "w") as file:
         file.write(f"\nDATASET =  {instance.Dataset}\n")
         for solution_day in BestSolution:
             # print("DAY =", day)
