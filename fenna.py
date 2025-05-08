@@ -424,6 +424,7 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
     trucks = []
     cost = 0
     location_depot = 1
+    numberOfTrucks = 0 
 
     num_pivots = 0
     gamma = 0 
@@ -484,8 +485,8 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
 
         for hub_id, products in truck.deliveries:
             routes.append([truck.vehicle_id, hub_id, list(products)])
+            numberOfTrucks += 1
     
-    numberOfTrucks = len(trucks) # last van number is total number of vans used
     cost += instance.VanDayCost * numberOfTrucks
     return numberOfTrucks, routes, cost
        
