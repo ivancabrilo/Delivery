@@ -213,8 +213,8 @@ def calculateScores(hub_ID, requests_for_hub, distance_df, num_pivots, gamma):
     
     return (demand_hub, scores)
 
-def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df, scores):
-    best_value = float("inf")
+def findBestInsertion(available_vans, vans, requests_for_hub_copy):
+    best_m = float("inf")
     best_h = []
     best_after = -1
     index_best_van = -1
@@ -223,16 +223,13 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df, 
         van = vans[j-1]
         for request in requests_for_hub_copy:
             for i in range(len(van.all_visit_locations)-1):
-                m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1], distance_df)
-                hashable_request = (request[0], request[1], request[2], tuple(request[3]))
-                score = scores.get(hashable_request, 0)
-
-                weighted_cost = m - score * 1 # Adjust the weight as needed
-                if weighted_cost < best_value:
-                    best_value = weighted_cost
+                m = extramileage(instance, van.all_visit_locations[i], request[2], van.all_visit_locations[i+1])
+                if m < best_m:
+                    best_m = m 
                     best_h = request
                     best_after = i
                     index_best_van = j-1
+    return (best_m, best_h, best_after, index_best_van)
 
     return (best_value, best_h, best_after, index_best_van)
 
@@ -251,7 +248,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
     # Find the best routes for each hub 
     for hub in instance.Hubs:
         requests_for_hub = hubs_to_requests[hub.ID]
-        num_pivots = 10
+        num_pivots = 10 # number of requests 
         gamma = 2.5
         demand_hub, scores = calculateScores(hub.ID, requests_for_hub, distance_df, num_pivots, gamma)
         lowest_routes_cost = float("inf")
