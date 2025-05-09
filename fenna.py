@@ -476,11 +476,20 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                 truck.visits = truck.visits[truck.visits != best_h[0]]
                 break
 
-        route = [truck.visits.tolist(), truck.products]
+        route = []
+        start = 0
+        for i, visit in enumerate(truck.visits.tolist()):
+            length = math.ceil(len(truck.products) / len(truck.visits.tolist()))
+            products = truck.products[start:start + length]
+            route.append([visit, products.tolist()])
+            start += length
+
         location_ID_last_visit = dict_hubs[truck.visits[-1]]
         cost += instance.TruckDistanceCost * distance_df.loc[location_depot, location_ID_last_visit]
-        routes.append(route)
+        for r in route: 
+            routes.append(r)
 
+    numberOfTrucks = len(routes)
     cost += instance.VanDayCost * numberOfTrucks
     return numberOfTrucks, routes, cost
        
@@ -489,7 +498,7 @@ def printTruckRoutes(numberOfTrucks, routes):
     print("NUMBER_OF_TRUCKS = ", numberOfTrucks)
     for idx, route in enumerate(routes):
         hubID = route[0]
-        amounts = route[2]  # this is a list
+        amounts = route[1]  # this is a list
         amounts_str = ", ".join(str(int(r)) for r in amounts)
         print(f"{idx+1} H{hubID} {amounts_str}")
 
