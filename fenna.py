@@ -213,7 +213,7 @@ def calculateScores(hub_ID, requests_for_hub, distance_df, num_pivots, gamma):
     
     return (demand_hub, scores)
 
-def findBestInsertion(available_vans, vans, requests_for_hub_copy):
+def findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df):
     best_m = float("inf")
     best_h = []
     best_after = -1
@@ -223,7 +223,7 @@ def findBestInsertion(available_vans, vans, requests_for_hub_copy):
         van = vans[j-1]
         for request in requests_for_hub_copy:
             for i in range(len(van.all_visit_locations)-1):
-                m = extramileage(instance, van.all_visit_locations[i], request[2], van.all_visit_locations[i+1])
+                m = extramileage(van.all_visit_locations[i], request[2], van.all_visit_locations[i+1], distance_df)
                 if m < best_m:
                     best_m = m 
                     best_h = request
@@ -288,7 +288,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
         
             # Runs as long as still requests available 
             while requests_for_hub_copy:
-                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df, scores_copy)
+                best_m, best_h, best_after, index_best_van = findBestInsertion(available_vans, vans, requests_for_hub_copy, distance_df)
 
                 # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
                 vans[index_best_van].visits = np.insert(vans[index_best_van].visits, best_after-1, best_h[0]) # best_after-1 since this is an index for all_visit_locations where the first index is for the hub and this is not the case for the visits
@@ -430,9 +430,10 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
 
     # Runs untill all requests are served and uses as many vans as needed
     while hubProductsGrouped:
+        numberOfTrucks += 1
         hub_with_max_score = max(scores, key=scores.get) # this is the pivot
-        
         truck = Vehicle("truck", len(trucks) + 1, instance.TruckCapacity, instance.TruckMaxDistance, [np.array([], dtype=int)], np.array([], dtype=int), [])
+        
         trucks.append(truck)
         index_this_truck = len(trucks) - 1
         available_trucks = [index_this_truck]
@@ -456,7 +457,7 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
             truck.all_visit_locations = np.insert(truck.all_visit_locations, 0, location_depot)
             truck.all_visit_locations = np.append(truck.all_visit_locations, location_depot) 
 
-            best_m, best_h, best_after, index_best_truck = findBestInsertion(available_trucks, trucks, hubProductsGrouped, distance_df, scores)
+            best_m, best_h, best_after, index_best_truck = findBestInsertion(available_trucks, trucks, hubProductsGrouped, distance_df)
 
             if index_best_truck == -1:
                 break # no valid insertion
@@ -472,18 +473,14 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                 scores.pop(hashable_best_h)
                 cost += best_m * instance.TruckDistanceCost
             else:
-                idx = np.where(truck.visits == best_h[0])[0]
-                if len(idx) > 0:
-                    truck.visits = np.delete(truck.visits, idx[0])
+                truck.visits = truck.visits[truck.visits != best_h[0]]
                 break
 
+        route = [truck.visits.tolist(), truck.products]
         location_ID_last_visit = dict_hubs[truck.visits[-1]]
         cost += instance.TruckDistanceCost * distance_df.loc[location_depot, location_ID_last_visit]
+        routes.append(route)
 
-        for hub_id, products in truck.deliveries:
-            routes.append([truck.vehicle_id, hub_id, list(products)])
-            numberOfTrucks += 1
-    
     cost += instance.VanDayCost * numberOfTrucks
     return numberOfTrucks, routes, cost
        
