@@ -418,7 +418,6 @@ def hubProducts(groupCustomersToHubs, instance, formatted_requests): # assuming 
 
 def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
     routes = []
-    trucks = []
     cost = 0
     location_depot = 1
     numberOfTrucks = 0 
@@ -432,11 +431,7 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
     while hubProductsGrouped:
         numberOfTrucks += 1
         hub_with_max_score = max(scores, key=scores.get) # this is the pivot
-        truck = Vehicle("truck", len(trucks) + 1, instance.TruckCapacity, instance.TruckMaxDistance, [np.array([], dtype=int)], np.array([], dtype=int), [])
-        
-        trucks.append(truck)
-        index_this_truck = len(trucks) - 1
-        available_trucks = [index_this_truck]
+        truck = Vehicle("truck", numberOfTrucks, instance.TruckCapacity, instance.TruckMaxDistance, [np.array([], dtype=int)], np.array([], dtype=int), [])
         
         truck.visits = np.append(truck.visits, hub_with_max_score[0])
         distance = distance_df.loc[location_depot, hub_with_max_score[2]]
@@ -451,16 +446,21 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
         cost += instance.TruckDistanceCost * distance
     
         while hubProductsGrouped:
-            # all visits inlcuding hubs at start and end
-            truck.all_visit_locations = np.array(list(map(dict_hubs.get, truck.visits)))# to make the request IDs into location IDs
-            # Adding the hub loction ID at frond and back since it is the start and end
-            truck.all_visit_locations = np.insert(truck.all_visit_locations, 0, location_depot)
-            truck.all_visit_locations = np.append(truck.all_visit_locations, location_depot) 
-
-            best_m, best_h, best_after, index_best_truck = findBestInsertion(available_trucks, trucks, hubProductsGrouped, distance_df)
-
-            if index_best_truck == -1:
-                break # no valid insertion
+            best_m = float("inf")
+            best_h = []
+            best_after = -1
+            for hub in hubProductsGrouped:
+                # all visits inlcuding hubs at start and end
+                truck.all_visit_locations = np.array(list(map(dict_hubs.get, truck.visits)))# to make the request IDs into location IDs
+                # Adding the hub loction ID at frond and back since it is the start and end
+                truck.all_visit_locations = np.insert(truck.all_visit_locations, 0, location_depot)
+                truck.all_visit_locations = np.append(truck.all_visit_locations, location_depot) 
+                for i in range(len(truck.all_visit_locations)-1):
+                    m = extramileage(truck.all_visit_locations[i], hub[2], truck.all_visit_locations[i+1], distance_df)
+                    if m < best_m:
+                        best_m = m 
+                        best_h = hub
+                        best_after = i
             
             # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
             truck.visits = np.insert(truck.visits, best_after - 1, best_h[0])
@@ -499,7 +499,7 @@ def writeTruckRoutes(numberOfTrucks, routes):
     lines.append(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
     for idx, route in enumerate(routes):
         hubID = route[0]
-        amounts = route[2]  # this is a list
+        amounts = route[1]  # this is a list
         amounts_str = ",".join(str(int(r)) for r in amounts)
         lines.append(f"{idx+1} H{hubID} {amounts_str}")
     return "\n".join(lines)
