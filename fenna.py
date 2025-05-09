@@ -512,7 +512,7 @@ def printTruckRoutes(numberOfTrucks, routes):
         # Loop through each visit in the truck route
         for visit, products in route:
             # Convert products to a string of numbers, separated by commas
-            products_str = ", ".join(str(int(p)) for p in products)
+            products_str = ",".join(str(int(p)) for p in products)
             # Append the hub and products to the route_str for the truck
             route_str += f" H{visit} {products_str}"
         
@@ -530,7 +530,7 @@ def writeTruckRoutes(numberOfTrucks, routes):
         # Loop through each visit in the truck route
         for visit, products in route:
             # Convert products to a string of numbers, separated by commas
-            products_str = ", ".join(str(int(p)) for p in products)
+            products_str = ",".join(str(int(p)) for p in products)
             # Append the hub and products to the route_str for the truck
             route_str += f" H{visit} {products_str}"
         
