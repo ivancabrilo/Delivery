@@ -476,41 +476,68 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                 truck.visits = truck.visits[truck.visits != best_h[0]]
                 break
 
-        route = []
-        start = 0
-        for i, visit in enumerate(truck.visits.tolist()):
-            length = math.ceil(len(truck.products) / len(truck.visits.tolist()))
-            products = truck.products[start:start + length]
-            route.append([visit, products.tolist()])
-            start += length
+        # route = []
+        # start = 0
+        # for i, visit in enumerate(truck.visits.tolist()):
+        #     length = math.ceil(len(truck.products) / len(truck.visits.tolist()))
+        #     products = truck.products[start:start + length]
+        #     route.append([visit, products.tolist()])
+        #     start += length
 
+        if len(truck.visits.tolist()) > 1:
+            route = []
+            start = 0
+            for i, visit in enumerate(truck.visits.tolist()):
+                length = math.ceil(len(truck.products) / len(truck.visits.tolist()))
+                products = truck.products[start:start + length]
+                route.append([visit, np.array(products, dtype = int)])
+                start += length
+        else: 
+            route = [[truck.visits.tolist()[0], truck.products]]
+        
         location_ID_last_visit = dict_hubs[truck.visits[-1]]
-        cost += instance.TruckDistanceCost * distance_df.loc[location_depot, location_ID_last_visit]
-        for r in route: 
-            routes.append(r)
+        cost += instance.TruckDistanceCost * calculateDistance(location_depot, location_ID_last_visit) 
+        routes.append(route)
 
     numberOfTrucks = len(routes)
     cost += instance.VanDayCost * numberOfTrucks
     return numberOfTrucks, routes, cost
        
 def printTruckRoutes(numberOfTrucks, routes):
-    # prints the routes for the trucks
-    print("NUMBER_OF_TRUCKS = ", numberOfTrucks)
+    print(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
+    
     for idx, route in enumerate(routes):
-        hubID = route[0]
-        amounts = route[1]  # this is a list
-        amounts_str = ", ".join(str(int(r)) for r in amounts)
-        print(f"{idx+1} H{hubID} {amounts_str}")
+        route_str = f"{idx + 1}"
+        
+        # Loop through each visit in the truck route
+        for visit, products in route:
+            # Convert products to a string of numbers, separated by commas
+            products_str = ", ".join(str(int(p)) for p in products)
+            # Append the hub and products to the route_str for the truck
+            route_str += f" H{visit} {products_str}"
+        
+        # Print the entire route for the truck in one line
+        print(route_str)
+
 
 def writeTruckRoutes(numberOfTrucks, routes):
-    # prints the routes for the trucks
     lines = []
     lines.append(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
+    
     for idx, route in enumerate(routes):
-        hubID = route[0]
-        amounts = route[1]  # this is a list
-        amounts_str = ",".join(str(int(r)) for r in amounts)
-        lines.append(f"{idx+1} H{hubID} {amounts_str}")
+        route_str = f"{idx + 1}"
+        
+        # Loop through each visit in the truck route
+        for visit, products in route:
+            # Convert products to a string of numbers, separated by commas
+            products_str = ", ".join(str(int(p)) for p in products)
+            # Append the hub and products to the route_str for the truck
+            route_str += f" H{visit} {products_str}"
+        
+        # Add the route for this truck to the list of lines
+        lines.append(route_str)
+    
+    # Join all lines into a single string separated by newlines
     return "\n".join(lines)
 
 def Optimize(instance):
