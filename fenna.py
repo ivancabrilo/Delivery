@@ -542,7 +542,7 @@ def writeTruckRoutes(numberOfTrucks, routes):
 
 def Optimize(instance):
     all_formatted = formatRequest(instance) # put here such that we only need to run it once
-    iterations = 100
+    iterations = 0
     offset_range = 3
     dict_hubs, dict_requests = dictionariesLocations(instance)
     distance_df = distanceMatrix(instance) # distance matrix between the hubs and the requests
