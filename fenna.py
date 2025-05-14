@@ -169,6 +169,10 @@ def calculateScores(hub_ID, requests_for_hub, distance_df, num_pivots, gamma):
     if requests_for_hub:
         q_max = max([np.sum(request[3]) for request in requests_for_hub]) 
         c0_max = max([distance_df.loc[hub_ID + 1, request[2]] for request in requests_for_hub]) 
+        if q_max == 0:
+            q_max = 1
+        if c0_max == 0:
+            c0_max = 1     
     else:
         q_max = c0_max = 1
     
@@ -421,25 +425,44 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
 
     num_pivots = 0
     gamma = 0 
-    
-    demand, scores = calculateScores((location_depot - 1), hubProductsGrouped, distance_df, num_pivots, gamma) 
 
     # Runs untill all requests are served and uses as many vans as needed
     while hubProductsGrouped:
+        demand, scores = calculateScores((location_depot - 1), hubProductsGrouped, distance_df, num_pivots, gamma)
+
         numberOfTrucks += 1
         hub_with_max_score = max(scores, key=scores.get) # this is the pivot
         truck = Vehicle("truck", numberOfTrucks, instance.TruckCapacity, instance.TruckMaxDistance, np.array([], dtype=int), np.array([], dtype=int))
         
         truck.visits = np.append(truck.visits, hub_with_max_score[0])
         distance = distance_df.loc[location_depot, hub_with_max_score[2]]
+        
         amounts = np.array(hub_with_max_score[3], dtype = int)
 
-        if np.sum(amounts) <= instance.TruckCapacity:
-            truck.load(hub_with_max_score[0], amounts, distance)
-            hubProductsGrouped.remove([hub_with_max_score[0],hub_with_max_score[1], hub_with_max_score[2], list(amounts)])
-            scores.pop(hub_with_max_score)
+        total_amount = np.sum(amounts)
+        if total_amount <= truck.capacity:
+            amount_to_load = amounts.copy()
+        else:
+            ratio = truck.capacity / total_amount
+            amount_to_load = np.floor(amounts * ratio).astype(int)
 
+        truck.load(hub_with_max_score[0], amount_to_load, distance)
+        remaining_amount = amounts - amount_to_load
+
+        hubProductsGrouped.remove([hub_with_max_score[0], hub_with_max_score[1], hub_with_max_score[2], list(amounts)])
+        if np.any(remaining_amount > 0):
+            hubProductsGrouped.append([hub_with_max_score[0], hub_with_max_score[1], hub_with_max_score[2], list(remaining_amount)])
+
+        demand, scores = calculateScores((location_depot - 1), hubProductsGrouped, distance_df, num_pivots, gamma)
+        
         cost += instance.TruckDistanceCost * distance
+
+        if np.sum(amount_to_load) >= truck.capacity or truck.milage <= 0:
+            route = [[delivery[0], np.array(delivery[1], dtype = int)] for delivery in truck.deliveries]
+            location_ID_last_visit = dict_hubs[truck.visits[-1]]
+            cost += instance.TruckDistanceCost * distance_df.iloc[location_depot, location_ID_last_visit]
+            routes.append(route)
+            continue
     
         while hubProductsGrouped:
             best_m = float("inf")
@@ -464,26 +487,32 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
             truck.visits = np.insert(truck.visits, best_after - 1, best_h[0])
             location_ID_last_visit = dict_hubs[truck.visits[-1]] # Location ID of request is request ID plus the number of hubs
 
-            if (truck.capacity - np.sum(best_h[3]) >= 0) & (truck.milage - best_m - distance_df.loc[location_depot, location_ID_last_visit] >= 0): 
-                truck.load(best_h[0], best_h[3], best_m) # extra distance to travel is extramileage m
+            amounts = np.array(best_h[3], dtype = int)
+            available_distance = truck.milage - best_m - distance_df.loc[location_depot, location_ID_last_visit]
+
+            if (np.sum(amounts) < truck.capacity) and (available_distance > 0): 
+                truck.load(best_h[0], amounts, best_m) # extra distance to travel is extramileage m
                 hubProductsGrouped.remove(best_h)
-                scores.pop((best_h[0], best_h[1], best_h[2], tuple(best_h[3])))
+                demand, scores = calculateScores((location_depot - 1), hubProductsGrouped, distance_df, num_pivots, gamma)
                 cost += best_m * instance.TruckDistanceCost
             else:
-                truck.visits = truck.visits[truck.visits != best_h[0]]
-                break
+                total_amount = np.sum(amounts)
+                if total_amount <= truck.capacity:
+                    amount_to_load = amounts.copy()
+                else: 
+                    ratio = truck.capacity / total_amount
+                    amount_to_load = np.floor(amounts * ratio).astype(int)
 
+                if np.any(amount_to_load > 0) and (available_distance > 0):
+                    truck.load(best_h[0], amount_to_load, best_m)
+                    remaining_amount = amounts - amount_to_load
 
-        # if len(truck.visits.tolist()) > 1:
-        #     route = []
-        #     start = 0
-        #     for i, visit in enumerate(truck.visits.tolist()):
-        #         length = math.ceil(len(truck.products) / len(truck.visits.tolist()))
-        #         products = truck.products[start:start + length]
-        #         route.append([visit, np.array(products, dtype = int)])
-        #         start += length
-        # else: 
-        #     route = [[truck.visits.tolist()[0], truck.products]]
+                    best_h[3] = list(remaining_amount)
+                    cost += best_m * instance.TruckDistanceCost
+
+                else:
+                    truck.visits = truck.visits[truck.visits != best_h[0]]
+                    break
 
 
         route = [[delivery[0], np.array(delivery[1], dtype=int)] for delivery in truck.deliveries]
@@ -585,18 +614,6 @@ def Optimize(instance):
             file.write("\n")
             file.write(writeVanRoutes(numberOfVans, routesVans))
             file.write("\n")
-
-    # with open("solution_main.txt", "w") as file:
-    #     file.write(f"\nDAY = {day}\n")
-    #     file.write("\n")
-    #     file.write(writeTruckRoutes(numberOfTrucks, routesTrucks))
-    #     file.write("\n")
-    #     file.write(writeVanRoutes(numberOfVans, routes))
-    #     file.write("\n")
-        
-    
-    # for res in result:
-    #     print(res, "\n")
    
 if __name__ == "__main__":
     random.seed(1234)
