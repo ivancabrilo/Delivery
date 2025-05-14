@@ -501,7 +501,7 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                 cost += best_m * instance.TruckDistanceCost
                 continue
 
-            ratio = truck.capacity / total_amount if total_amount > 0 else 0
+            ratio = truck.capacity / np.sum(amounts) if np.sum(amounts) > 0 else 0
             amount_to_load = np.floor(amounts * ratio).astype(int)
 
             if np.any(amount_to_load > 0) and available_distance > 0:
@@ -511,13 +511,10 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                 hubProductsGrouped.remove(best_h)
 
                 if np.any(remaining_amount > 0):
-                    hubProductsGrouped.append((best_h[0], best_h[1], best_h[2], list(remaining_amount)))
+                    hubProductsGrouped.append([best_h[0], best_h[1], best_h[2], list(remaining_amount)])
                 cost += best_m * instance.TruckDistanceCost
             else:
-                if np.sum(amounts) > truck.capacity or available_distance <= 0:
-                    hubProductsGrouped.remove(best_h)
-                else:
-                    break
+                break
 
 
         route = [[delivery[0], np.array(delivery[1], dtype=int)] for delivery in truck.deliveries]
