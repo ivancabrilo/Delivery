@@ -466,7 +466,7 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
     
         while hubProductsGrouped:
             best_m = float("inf")
-            best_h = []
+            best_h = None
             best_after = -1
 
             # all visits inlcuding hubs at start and end
@@ -482,6 +482,9 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
                         best_m = m 
                         best_h = hub
                         best_after = i
+
+            if best_h is None:
+                break
             
             # Do this before if statement, because best_h could also be inserted at the end and then its distance to the hub needs to be considered
             truck.visits = np.insert(truck.visits, best_after - 1, best_h[0])
@@ -491,27 +494,29 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
             available_distance = truck.milage - best_m - distance_df.loc[location_depot, location_ID_last_visit]
 
             if (np.sum(amounts) < truck.capacity) and (available_distance > 0): 
+                truck.visits = np.append(truck.visits, best_h[0])
                 truck.load(best_h[0], amounts, best_m) # extra distance to travel is extramileage m
                 hubProductsGrouped.remove(best_h)
                 demand, scores = calculateScores((location_depot - 1), hubProductsGrouped, distance_df, num_pivots, gamma)
                 cost += best_m * instance.TruckDistanceCost
+                continue
+
+            ratio = truck.capacity / total_amount if total_amount > 0 else 0
+            amount_to_load = np.floor(amounts * ratio).astype(int)
+
+            if np.any(amount_to_load > 0) and available_distance > 0:
+                truck.visits = np.append(truck.visits, best_h[0])
+                truck.load(best_h[0], amount_to_load, best_m)
+                remaining_amount = amounts - amount_to_load
+                hubProductsGrouped.remove(best_h)
+
+                if np.any(remaining_amount > 0):
+                    hubProductsGrouped.append((best_h[0], best_h[1], best_h[2], list(remaining_amount)))
+                cost += best_m * instance.TruckDistanceCost
             else:
-                total_amount = np.sum(amounts)
-                if total_amount <= truck.capacity:
-                    amount_to_load = amounts.copy()
-                else: 
-                    ratio = truck.capacity / total_amount
-                    amount_to_load = np.floor(amounts * ratio).astype(int)
-
-                if np.any(amount_to_load > 0) and (available_distance > 0):
-                    truck.load(best_h[0], amount_to_load, best_m)
-                    remaining_amount = amounts - amount_to_load
-
-                    best_h[3] = list(remaining_amount)
-                    cost += best_m * instance.TruckDistanceCost
-
+                if np.sum(amounts) > truck.capacity or available_distance <= 0:
+                    hubProductsGrouped.remove(best_h)
                 else:
-                    truck.visits = truck.visits[truck.visits != best_h[0]]
                     break
 
 
