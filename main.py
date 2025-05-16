@@ -141,7 +141,7 @@ def groupRequestsToHubsMulti(instance, formatted_requests, distance_df, iteratio
             for hub in instance.Hubs:
                 if req_id in hub.allowedRequests:
                     hub_loc = instance.Locations[hub.ID]  # Hubs use ID as index
-                    dist = math.sqrt((hub_loc.X - shifted_x) ** 2 + (hub_loc.Y - shifted_y) ** 2)
+                    dist = math.ceil(math.sqrt((hub_loc.X - shifted_x) ** 2 + (hub_loc.Y - shifted_y) ** 2))
 
                     if dist < closest_dist:
                         closest_dist = dist
@@ -319,7 +319,6 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
             else: 
                 # Then not all requests for this hub are surved and so it is not a valid routing
                 routes_cost = float("inf")
-            
             if routes_cost < lowest_routes_cost:
                 lowest_routes_cost = routes_cost
                 best_routes = option_routes
@@ -328,17 +327,7 @@ def routeVan(instance, groupRequestsToHubs, formatted_requests, dict_requests, d
         totalNumberOfVans += best_number_of_vans
         routes += best_routes
         cost += lowest_routes_cost
-
     return totalNumberOfVans, routes, cost
-
-def printVanRoutes(numberOfVans, routes):
-    # prints the routes for the vans
-    print("NUMBER_OF_VANS = ", numberOfVans)
-    for idx, route in enumerate(routes):
-        hubID = route[0]
-        ID_requests = route[1]  # this is a list
-        requests_str = " ".join(str(r) for r in ID_requests)
-        print(f"{idx+1} H{hubID} {requests_str}")
 
 def writeVanRoutes(numberOfVans, routes):
     # prints the routes for the vans
@@ -530,23 +519,6 @@ def routeTruck(instance, hubProductsGrouped, dict_hubs, distance_df):
     cost += instance.VanDayCost * numberOfTrucks
     return numberOfTrucks, routes, cost
        
-def printTruckRoutes(numberOfTrucks, routes):
-    print(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
-    
-    for idx, route in enumerate(routes):
-        route_str = f"{idx + 1}"
-        
-        # Loop through each visit in the truck route
-        for visit, products in route:
-            # Convert products to a string of numbers, separated by commas
-            products_str = ",".join(str(int(p)) for p in products)
-            # Append the hub and products to the route_str for the truck
-            route_str += f" H{visit} {products_str}"
-        
-        # Print the entire route for the truck in one line
-        print(route_str)
-
-
 def writeTruckRoutes(numberOfTrucks, routes):
     lines = []
     lines.append(f"NUMBER_OF_TRUCKS = {numberOfTrucks}")
@@ -569,18 +541,22 @@ def writeTruckRoutes(numberOfTrucks, routes):
 
 def Optimize(instance):
     all_formatted = formatRequest(instance) # put here such that we only need to run it once
-    iterations = 0
+    iterations = 100
     offset_range = 3
     dict_hubs, dict_requests = dictionariesLocations(instance)
     distance_df = distanceMatrix(instance) # distance matrix between the hubs and the requests
     BestSolution = None
     lowestCost = float("inf")
+    # best_cost_van = 0
+    # best_cost_truck = 0
     for formatted, extra_cost in all_formatted:
         all_groupings = groupRequestsToHubsMulti(instance, formatted, distance_df, iterations, offset_range)
         for grouped in all_groupings:
             results_hubs = hubProducts(grouped, instance, formatted)
             for result_hubs in results_hubs:
                 cost = extra_cost
+                # total_van_cost = 0
+                # total_truck_cost = 0
                 # Calculate cost of used hubs
                 for hub in set(grouped.values()):
                     cost += instance.Hubs[hub-1].hubOpeningCost
@@ -593,17 +569,24 @@ def Optimize(instance):
                     result_day = [hub_request for hub_request in result_hubs if hub_request[1] == day]
                     numberOfVans, routesVans, costVans = routeVan(instance, grouped, formatted_day, dict_requests, distance_df)
                     numberOfTrucks, routesTrucks, costTrucks = routeTruck(instance, result_day, dict_hubs, distance_df)
+                    # total_van_cost += costVans
+                    # total_truck_cost += costTrucks
                     cost += (costVans + costTrucks)
                     all_numbers_of_vans.append(numberOfVans)
                     all_numbers_of_trucks.append(numberOfTrucks)
                     new_solution_day = Solution(day,numberOfVans, routesVans, numberOfTrucks, routesTrucks, cost)
                     new_solution.append(new_solution_day)
-                    
+
                 total_cost = (cost + max(all_numbers_of_vans) * instance.VanCost + max(all_numbers_of_trucks) * instance.TruckCost)
+
                 if(total_cost < lowestCost):
                     lowestCost = total_cost
                     BestSolution = new_solution
+                    # best_cost_van = total_van_cost
+                    # best_cost_truck = total_truck_cost
     print(lowestCost)
+    #print("van cost:", best_cost_van)
+    #print("truck cost:", best_cost_truck)
     # Write solution in file
     with open("solution_main.txt", "w") as file:
         file.write(f"\nDATASET =  {instance.Dataset}\n")
