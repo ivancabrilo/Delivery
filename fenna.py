@@ -357,10 +357,13 @@ def formatRequest(instance):
     if instance.deliverEarlyPenalty == 0:
         max_days = 0
     else:
-        max_days = instance.Days
+        if instance.Days > 10 :
+            max_days = 3
+        else:   
+            max_days = instance.Days
 
     # Here we are looping over all options of number of days between deliveries. So say i is 2, vans only deliver to requests on days 1, 3, 5 etc. 
-    for i in range(max_days+1):
+    for i in range(max_days + 1): # have to look how many days
         extra_cost = 0
         # returns the request in a format that is easier to work with
         formatted = []
@@ -602,7 +605,7 @@ def Optimize(instance):
                     BestSolution = new_solution
     print(lowestCost)
     # Write solution in file
-    with open("solution_fenna.txt", "w") as file:
+    with open("solution_test_4.txt", "w") as file:
         file.write(f"\nDATASET =  {instance.Dataset}\n")
         for solution_day in BestSolution:
             # print("DAY =", day)
