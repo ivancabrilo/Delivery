@@ -349,7 +349,7 @@ def formatRequest(instance):
     if instance.deliverEarlyPenalty == 0:
         max_days = 0
     else:
-        max_days = 2 #instance.Days # Can be adusted to reduce runtime
+        max_days = instance.Days # Can be adusted to reduce runtime
 
     # Here we are looping over all options of number of days between deliveries. So say i is 2, vans only deliver to requests on days 1, 3, 5 etc. 
     for i in range(max_days + 1): # have to look how many days
